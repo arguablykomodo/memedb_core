@@ -27,3 +27,25 @@ impl Tags {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_tags() {
+    let mut tags = Tags::new();
+
+    tags.add_tag("foo".to_string());
+    assert!(tags.has_tag(&"foo".to_string()));
+
+    tags.remove_tag(&"foo".to_string());
+    assert!(!tags.has_tag(&"foo".to_string()));
+
+    tags.toggle_tag("foo".to_string());
+    assert!(tags.has_tag(&"foo".to_string()));
+
+    tags.toggle_tag("foo".to_string());
+    assert!(!tags.has_tag(&"foo".to_string()));
+  }
+}
