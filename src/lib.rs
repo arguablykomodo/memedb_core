@@ -1,4 +1,5 @@
 pub mod tags;
+mod png;
 
 #[cfg(test)]
 mod tests {
