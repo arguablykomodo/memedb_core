@@ -1,15 +1,14 @@
 mod png;
 mod reader;
 pub mod error;
-pub mod tags;
 
 use error::Error;
 use reader::Reader;
 use std::fs::File;
 use std::io::Read;
-use tags::Tags;
+use std::collections::HashSet;
 
-pub fn read_tags(path: String) -> Result<Tags, Error> {
+pub fn read_tags(path: String) -> Result<HashSet<String>, Error> {
   let mut bytes = File::open(path)?.bytes();
   png::PngReader::read_tags(&mut bytes)
 }
