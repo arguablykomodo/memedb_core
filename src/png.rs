@@ -20,7 +20,6 @@ impl Reader for PngReader {
       for i in 0..4 {
         length += (PngReader::next(bytes)? as usize) << (3 - i) * 8;
       }
-      println!("{}", length);
 
       let mut chunk_type: [u8; 4] = [0; 4];
       for i in 0..4 {
