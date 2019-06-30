@@ -1,6 +1,6 @@
-mod error;
 mod png;
 mod reader;
+pub mod error;
 pub mod tags;
 
 use error::Error;
