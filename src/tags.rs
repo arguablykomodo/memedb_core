@@ -1,5 +1,7 @@
 use std::collections::HashSet;
+use std::cmp::PartialEq;
 
+#[derive(Debug, PartialEq)]
 pub struct Tags(HashSet<String>);
 
 impl Tags {
