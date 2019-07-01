@@ -152,7 +152,8 @@ mod tests {
   #[test]
   fn test_write_empty() {
     let mut tags = HashSet::new();
-    tags.insert(String::from("test"));
+    tags.insert(String::from("foo"));
+    tags.insert(String::from("bar"));
 
     let mut file = OpenOptions::new()
       .read(true)
@@ -162,6 +163,23 @@ mod tests {
     PngReader::write_tags(&mut file, &tags).unwrap();
 
     let mut file = File::open("tests/write_empty.png").unwrap().bytes();
+    assert_eq!(PngReader::read_tags(&mut file).unwrap(), tags);
+  }
+
+  #[test]
+  fn test_write_tagged() {
+    let mut tags = HashSet::new();
+    tags.insert(String::from("a"));
+    tags.insert(String::from("b"));
+
+    let mut file = OpenOptions::new()
+      .read(true)
+      .write(true)
+      .open("tests/write_tagged.png")
+      .unwrap();
+    PngReader::write_tags(&mut file, &tags).unwrap();
+
+    let mut file = File::open("tests/write_tagged.png").unwrap().bytes();
     assert_eq!(PngReader::read_tags(&mut file).unwrap(), tags);
   }
 }
