@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::reader::Reader;
 
 use std::collections::HashSet;
-use std::io::{Bytes, Read, Seek, SeekFrom, Write};
+use std::io::{Bytes, Read};
 const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
 pub struct PngReader {}
@@ -57,10 +57,7 @@ impl Reader for PngReader {
     }
   }
 
-  fn write_tags(
-    file: &mut (impl Write + Read + Seek),
-    tags: &HashSet<String>,
-  ) -> Result<(), Error> {
+  fn write_tags(file: &mut (impl Read), tags: &HashSet<String>) -> Result<Vec<u8>, Error> {
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)?;
 
@@ -120,16 +117,14 @@ impl Reader for PngReader {
       i += (length as usize) + 4;
     }
 
-    file.seek(SeekFrom::Start(0))?;
-    file.write_all(&bytes)?;
-    Ok(())
+    Ok(bytes)
   }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use std::fs::{File, OpenOptions};
+  use std::fs::File;
 
   #[test]
   fn test_read_invalid() {
@@ -143,21 +138,21 @@ mod tests {
 
   #[test]
   fn test_read_empty() {
-    let mut bytes = File::open("tests/read_empty.png").unwrap().bytes();
+    let mut bytes = File::open("tests/empty.png").unwrap().bytes();
     let tags = HashSet::new();
     assert_eq!(PngReader::read_tags(&mut bytes).unwrap(), tags);
   }
 
   #[test]
   fn test_read_untagged() {
-    let mut bytes = File::open("tests/read_untagged.png").unwrap().bytes();
+    let mut bytes = File::open("tests/untagged.png").unwrap().bytes();
     let tags = HashSet::new();
     assert_eq!(PngReader::read_tags(&mut bytes).unwrap(), tags);
   }
 
   #[test]
   fn test_read_tagged() {
-    let mut bytes = File::open("tests/read_tagged.png").unwrap().bytes();
+    let mut bytes = File::open("tests/tagged.png").unwrap().bytes();
     let mut tags = HashSet::new();
     tags.insert("foo".to_owned());
     tags.insert("bar".to_owned());
@@ -179,22 +174,15 @@ mod tests {
 
   #[test]
   fn test_write_empty() {
-    let mut file = OpenOptions::new()
-      .read(true)
-      .write(true)
-      .open("tests/write_empty.png")
-      .unwrap();
+    let mut file = File::open("tests/empty.png").unwrap();
+
     let mut tags = HashSet::new();
     tags.insert("foo".to_owned());
     tags.insert("bar".to_owned());
-    assert_eq!(PngReader::write_tags(&mut file, &tags).unwrap(), ());
 
-    // Verify file was written correctly
-    let mut result = File::open("tests/write_empty.png").unwrap();
-    let mut result_bytes = Vec::new();
-    result.read_to_end(&mut result_bytes).unwrap();
+    let result_bytes = PngReader::write_tags(&mut file, &tags).unwrap();
 
-    let mut test = File::open("tests/read_tagged.png").unwrap();
+    let mut test = File::open("tests/tagged.png").unwrap();
     let mut test_bytes = Vec::new();
     test.read_to_end(&mut test_bytes).unwrap();
 
@@ -203,22 +191,15 @@ mod tests {
 
   #[test]
   fn test_write_untagged() {
-    let mut file = OpenOptions::new()
-      .read(true)
-      .write(true)
-      .open("tests/write_untagged.png")
-      .unwrap();
+    let mut file = File::open("tests/untagged.png").unwrap();
+
     let mut tags = HashSet::new();
     tags.insert("foo".to_owned());
     tags.insert("bar".to_owned());
-    assert_eq!(PngReader::write_tags(&mut file, &tags).unwrap(), ());
 
-    // Verify file was written correctly
-    let mut result = File::open("tests/write_untagged.png").unwrap();
-    let mut result_bytes = Vec::new();
-    result.read_to_end(&mut result_bytes).unwrap();
+    let result_bytes = PngReader::write_tags(&mut file, &tags).unwrap();
 
-    let mut test = File::open("tests/read_tagged.png").unwrap();
+    let mut test = File::open("tests/tagged.png").unwrap();
     let mut test_bytes = Vec::new();
     test.read_to_end(&mut test_bytes).unwrap();
 
@@ -227,20 +208,13 @@ mod tests {
 
   #[test]
   fn test_write_tagged() {
-    let mut file = OpenOptions::new()
-      .read(true)
-      .write(true)
-      .open("tests/write_tagged.png")
-      .unwrap();
+    let mut file = File::open("tests/tagged.png").unwrap();
+
     let tags = HashSet::new();
-    assert_eq!(PngReader::write_tags(&mut file, &tags).unwrap(), ());
 
-    // Verify file was written correctly
-    let mut result = File::open("tests/write_tagged.png").unwrap();
-    let mut result_bytes = Vec::new();
-    result.read_to_end(&mut result_bytes).unwrap();
+    let result_bytes = PngReader::write_tags(&mut file, &tags).unwrap();
 
-    let mut test = File::open("tests/read_untagged.png").unwrap();
+    let mut test = File::open("tests/untagged.png").unwrap();
     let mut test_bytes = Vec::new();
     test.read_to_end(&mut test_bytes).unwrap();
 
