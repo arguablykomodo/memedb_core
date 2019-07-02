@@ -68,6 +68,8 @@ impl Reader for PngReader {
       return Err(Error::UnknownFormat);
     };
 
+    let mut tags: Vec<String> = tags.iter().cloned().collect();
+    tags.sort_unstable();
     let mut tags: Vec<u8> = tags
       .iter()
       .cloned()
@@ -89,7 +91,6 @@ impl Reader for PngReader {
 
     let mut i = SIGNATURE.len();
     loop {
-      println!("{}", i);
       let length = bytes[i..i + 4]
         .iter()
         .enumerate()
@@ -131,55 +132,118 @@ mod tests {
   use std::fs::{File, OpenOptions};
 
   #[test]
-  fn test_read() {
-    let mut file = File::open("tests/jpg.jpg").unwrap().bytes();
+  fn test_read_invalid() {
+    let mut bytes = File::open("tests/jpg.jpg").unwrap().bytes();
     // mem::discriminant magic is used to compare enums without having to implement PartialEq
     assert_eq!(
-      std::mem::discriminant(&PngReader::read_tags(&mut file).unwrap_err()),
+      std::mem::discriminant(&PngReader::read_tags(&mut bytes).unwrap_err()),
       std::mem::discriminant(&Error::UnknownFormat)
     );
+  }
 
+  #[test]
+  fn test_read_empty() {
+    let mut bytes = File::open("tests/read_empty.png").unwrap().bytes();
     let tags = HashSet::new();
-    let mut file = File::open("tests/empty.png").unwrap().bytes();
-    assert_eq!(PngReader::read_tags(&mut file).unwrap(), tags);
+    assert_eq!(PngReader::read_tags(&mut bytes).unwrap(), tags);
+  }
 
+  #[test]
+  fn test_read_untagged() {
+    let mut bytes = File::open("tests/read_untagged.png").unwrap().bytes();
+    let tags = HashSet::new();
+    assert_eq!(PngReader::read_tags(&mut bytes).unwrap(), tags);
+  }
+
+  #[test]
+  fn test_read_tagged() {
+    let mut bytes = File::open("tests/read_tagged.png").unwrap().bytes();
     let mut tags = HashSet::new();
-    tags.insert(String::from("test"));
-    let mut file = File::open("tests/tagged.png").unwrap().bytes();
-    assert_eq!(PngReader::read_tags(&mut file).unwrap(), tags);
+    tags.insert("foo".to_owned());
+    tags.insert("bar".to_owned());
+    assert_eq!(PngReader::read_tags(&mut bytes).unwrap(), tags);
+  }
+
+  #[test]
+  fn test_write_invalid() {
+    let mut file = File::open("tests/jpg.jpg").unwrap();
+    let mut tags = HashSet::new();
+    tags.insert("foo".to_owned());
+    tags.insert("bar".to_owned());
+    // mem::discriminant magic is used to compare enums without having to implement PartialEq
+    assert_eq!(
+      std::mem::discriminant(&PngReader::write_tags(&mut file, &tags).unwrap_err()),
+      std::mem::discriminant(&Error::UnknownFormat)
+    );
   }
 
   #[test]
   fn test_write_empty() {
-    let mut tags = HashSet::new();
-    tags.insert(String::from("foo"));
-    tags.insert(String::from("bar"));
-
     let mut file = OpenOptions::new()
       .read(true)
       .write(true)
       .open("tests/write_empty.png")
       .unwrap();
-    PngReader::write_tags(&mut file, &tags).unwrap();
+    let mut tags = HashSet::new();
+    tags.insert("foo".to_owned());
+    tags.insert("bar".to_owned());
+    assert_eq!(PngReader::write_tags(&mut file, &tags).unwrap(), ());
 
-    let mut file = File::open("tests/write_empty.png").unwrap().bytes();
-    assert_eq!(PngReader::read_tags(&mut file).unwrap(), tags);
+    // Verify file was written correctly
+    let mut result = File::open("tests/write_empty.png").unwrap();
+    let mut result_bytes = Vec::new();
+    result.read_to_end(&mut result_bytes).unwrap();
+
+    let mut test = File::open("tests/read_tagged.png").unwrap();
+    let mut test_bytes = Vec::new();
+    test.read_to_end(&mut test_bytes).unwrap();
+
+    assert_eq!(result_bytes, test_bytes);
+  }
+
+  #[test]
+  fn test_write_untagged() {
+    let mut file = OpenOptions::new()
+      .read(true)
+      .write(true)
+      .open("tests/write_untagged.png")
+      .unwrap();
+    let mut tags = HashSet::new();
+    tags.insert("foo".to_owned());
+    tags.insert("bar".to_owned());
+    assert_eq!(PngReader::write_tags(&mut file, &tags).unwrap(), ());
+
+    // Verify file was written correctly
+    let mut result = File::open("tests/write_untagged.png").unwrap();
+    let mut result_bytes = Vec::new();
+    result.read_to_end(&mut result_bytes).unwrap();
+
+    let mut test = File::open("tests/read_tagged.png").unwrap();
+    let mut test_bytes = Vec::new();
+    test.read_to_end(&mut test_bytes).unwrap();
+
+    assert_eq!(result_bytes, test_bytes);
   }
 
   #[test]
   fn test_write_tagged() {
-    let mut tags = HashSet::new();
-    tags.insert(String::from("a"));
-    tags.insert(String::from("b"));
-
     let mut file = OpenOptions::new()
       .read(true)
       .write(true)
       .open("tests/write_tagged.png")
       .unwrap();
-    PngReader::write_tags(&mut file, &tags).unwrap();
+    let tags = HashSet::new();
+    assert_eq!(PngReader::write_tags(&mut file, &tags).unwrap(), ());
 
-    let mut file = File::open("tests/write_tagged.png").unwrap().bytes();
-    assert_eq!(PngReader::read_tags(&mut file).unwrap(), tags);
+    // Verify file was written correctly
+    let mut result = File::open("tests/write_tagged.png").unwrap();
+    let mut result_bytes = Vec::new();
+    result.read_to_end(&mut result_bytes).unwrap();
+
+    let mut test = File::open("tests/read_untagged.png").unwrap();
+    let mut test_bytes = Vec::new();
+    test.read_to_end(&mut test_bytes).unwrap();
+
+    assert_eq!(result_bytes, test_bytes);
   }
 }
