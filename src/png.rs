@@ -2,39 +2,36 @@ use crate::error::Error;
 use crate::reader::Reader;
 
 use std::collections::HashSet;
-use std::io::{Bytes, Read};
+use std::io::Read;
 const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
 pub struct PngReader {}
 
 impl Reader for PngReader {
-  fn read_tags(bytes: &mut Bytes<impl Read>) -> Result<HashSet<String>, Error> {
-    for byte in SIGNATURE.iter() {
-      if *byte != PngReader::next(bytes)? {
-        return Err(Error::UnknownFormat);
-      }
+  fn read_tags(file: &mut impl Read) -> Result<HashSet<String>, Error> {
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    let mut i = 0;
+
+    if bytes[0..SIGNATURE.len()] != *SIGNATURE {
+      return Err(Error::UnknownFormat);
     }
+    i += SIGNATURE.len();
 
     loop {
-      let mut length = 0;
-      for i in 0..4 {
-        length += (PngReader::next(bytes)? as usize) << (3 - i) * 8;
-      }
+      let length = bytes[i..i + 4]
+        .iter()
+        .enumerate()
+        .fold(0, |acc, (i, b)| (acc + *b as usize) << (3 - i) * 8);
+      i += 4;
 
-      let mut chunk_type: [u8; 4] = [0; 4];
-      for i in 0..4 {
-        chunk_type[i] = PngReader::next(bytes)?;
-      }
+      let chunk_type: &[u8] = &bytes[i..i + 4];
+      i += 4;
 
       if chunk_type == *b"meMe" {
-        let mut data = Vec::new();
-        for _ in 0..length {
-          data.push(PngReader::next(bytes)?);
-        }
-
         let mut tags = HashSet::new();
         let mut text = String::new();
-        for byte in data.iter() {
+        for byte in &bytes[i..i + length] {
           if *byte == b';' {
             tags.insert(text);
             text = String::new();
@@ -51,9 +48,7 @@ impl Reader for PngReader {
       }
 
       // Every chunk ends with a 4 byte long checksum
-      for _ in 0..(length + 4) {
-        PngReader::next(bytes)?;
-      }
+      i += length + 4;
     }
   }
 
@@ -73,7 +68,6 @@ impl Reader for PngReader {
       .map(|t| (t + ";").into_bytes())
       .flatten()
       .collect();
-
 
     let mut chunk_length = Vec::new();
     for i in 0..4 {
@@ -128,35 +122,35 @@ mod tests {
 
   #[test]
   fn test_read_invalid() {
-    let mut bytes = File::open("tests/jpg.jpg").unwrap().bytes();
+    let mut file = File::open("tests/jpg.jpg").unwrap();
     // mem::discriminant magic is used to compare enums without having to implement PartialEq
     assert_eq!(
-      std::mem::discriminant(&PngReader::read_tags(&mut bytes).unwrap_err()),
+      std::mem::discriminant(&PngReader::read_tags(&mut file).unwrap_err()),
       std::mem::discriminant(&Error::UnknownFormat)
     );
   }
 
   #[test]
   fn test_read_empty() {
-    let mut bytes = File::open("tests/empty.png").unwrap().bytes();
+    let mut file = File::open("tests/empty.png").unwrap();
     let tags = HashSet::new();
-    assert_eq!(PngReader::read_tags(&mut bytes).unwrap(), tags);
+    assert_eq!(PngReader::read_tags(&mut file).unwrap(), tags);
   }
 
   #[test]
   fn test_read_untagged() {
-    let mut bytes = File::open("tests/untagged.png").unwrap().bytes();
+    let mut file = File::open("tests/untagged.png").unwrap();
     let tags = HashSet::new();
-    assert_eq!(PngReader::read_tags(&mut bytes).unwrap(), tags);
+    assert_eq!(PngReader::read_tags(&mut file).unwrap(), tags);
   }
 
   #[test]
   fn test_read_tagged() {
-    let mut bytes = File::open("tests/tagged.png").unwrap().bytes();
+    let mut file = File::open("tests/tagged.png").unwrap();
     let mut tags = HashSet::new();
     tags.insert("foo".to_owned());
     tags.insert("bar".to_owned());
-    assert_eq!(PngReader::read_tags(&mut bytes).unwrap(), tags);
+    assert_eq!(PngReader::read_tags(&mut file).unwrap(), tags);
   }
 
   #[test]

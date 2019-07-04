@@ -6,11 +6,11 @@ use error::Error;
 use reader::Reader;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{Write};
 
 pub fn read_tags(path: String) -> Result<HashSet<String>, Error> {
-  let mut bytes = File::open(path)?.bytes();
-  png::PngReader::read_tags(&mut bytes)
+  let mut file = File::open(path)?;
+  png::PngReader::read_tags(&mut file)
 }
 
 pub fn write_tags(path: &String, tags: &HashSet<String>) -> Result<(), Error> {
