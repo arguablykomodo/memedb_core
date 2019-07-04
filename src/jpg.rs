@@ -3,14 +3,40 @@ use crate::reader::Reader;
 
 use std::collections::HashSet;
 use std::io::{Bytes, Read};
-const SIGNATURE: &[u8] = &[0xFF, 0xD8];
 
+/* Explanation:
+  1. JpgReader verifies the signature
+
+  [loop]
+  2. JpgReader tries to find a chunk
+    a. If the value in the var "byte" is an 0xFF then
+        that means the byte it has now is the chunk-type.
+        Finally try to guess if this chunk has data by going to [3]
+    b. if it is not then that probably means the
+        reader is inside a data chunk. JpgReader discards
+        the value, reads a new one and then goes to [2]
+
+  3. JpgReader reads the next byte
+    a. If it is an 0xFF, then this is the start of another chunk.
+      Save this value in the var "byte", process this chunk by going to [4]
+    b. Otherwise, it reads the next byte and appends them like this: (FIRST<<8 | SECOND)
+
+  4. Finally process the chunk
+    a. If the chunk type is 0xEn, then tags may be found here
+    b. If the chunk type is 0xD9, then this is the end of the file. The break the loop and finish by doing [5]
+    c. Any other type of chunk is skipped
+
+  5. Finish and return the tags
+*/
 enum JpgReaderState {
   watingChunkType,
+  recordChunkData(u16), //Data length
   watingChunkLength,
-  processChunk(Option<u16>),
+  processChunk,
 }
 pub struct JpgReader;
+const SIGNATURE: &[u8] = &[0xFF, 0xD8];
+const TAGS_CHUNK_TYPE: u8 = 0xE1;
 
 impl Reader for JpgReader {
   fn read_tags(bytes: &mut Bytes<impl Read>) -> Result<HashSet<String>, Error> {
@@ -25,6 +51,7 @@ impl Reader for JpgReader {
     let mut reader_state = JpgReaderState::watingChunkType;
     let mut last_byte = *SIGNATURE.last().unwrap();
     let mut byte = JpgReader::next(bytes)?;
+    let mut chunk_data: Vec<u8> = vec![];
     loop {
       /* if 0xFF == byte {
         let chunk_type = JpgReader::next(bytes)?;
@@ -106,7 +133,6 @@ impl Reader for JpgReader {
           let byte = JpgReader::next(bytes)?;
           skipped_bytes.push(byte);
           chunk_size -= 1;
-        }
         match std::str::from_utf8(&skipped_bytes) {
           Ok(v) if is_tags_chunk => {
             println!(
@@ -138,42 +164,64 @@ impl Reader for JpgReader {
       } */
       match reader_state {
         JpgReaderState::watingChunkType if last_byte == 0xFF => {
-          //println!("Retrieving chunk type");
+          println!("Retrieving chunk type");
           chunk_type = byte;
           println!("Chunk type: {:02X}", chunk_type);
+          // If we are in the end of the file, we manually set it to finish the parsing
           reader_state = if chunk_type == 0xD9 {
-            JpgReaderState::processChunk(None)
+            JpgReaderState::processChunk
           } else {
             JpgReaderState::watingChunkLength
           };
         }
         JpgReaderState::watingChunkType => {
-          //println!("Waiting chunk type...");
+          println!("Waiting chunk type...");
           last_byte = byte;
           byte = JpgReader::next(bytes)?;
-          //println!("Read byte: {:02X?}", byte);
+          println!("Read byte: {:02X}{:02X?}", last_byte, byte);
         }
         JpgReaderState::watingChunkLength => {
           println!("Getting chunk length");
           let next_byte = JpgReader::next(bytes)?;
           if next_byte == 0xFF {
             println!("0-length chunk");
-            reader_state = JpgReaderState::processChunk(None);
+            reader_state = JpgReaderState::recordChunkData(0);
             byte = next_byte;
           } else {
             last_byte = next_byte;
             byte = JpgReader::next(bytes)?;
             let chunk_length = ((last_byte as u16) << 8) | (byte as u16);
             println!("Chunk length: {:04X}", chunk_length);
-            reader_state = JpgReaderState::processChunk(Some(chunk_length))
+            reader_state = JpgReaderState::recordChunkData(chunk_length);
           }
         }
-        JpgReaderState::processChunk(length) => {
+        JpgReaderState::recordChunkData(length) => {
+          let length = if length > 0 { length - 2 } else { 0 };
+          println!("Storing {:04X} bytes of data", length);
+          chunk_data = Vec::with_capacity(length as usize);
+          for i in 0..length {
+            chunk_data.push(JpgReader::next(bytes)?);
+          }
+          last_byte = *chunk_data.last().unwrap_or(&last_byte);
+          reader_state = JpgReaderState::processChunk;
+          println!("Register states: {:02X} {:02X}", last_byte, byte);
+        }
+        JpgReaderState::processChunk => {
+          println!("Processing chunk of type {:02X}", chunk_type);
           match chunk_type {
             n @ 0xE0...0xEF => {
               println!("Found chunk of 0x{:02X}", n);
-              if n == 0xE1 {
+              if n == TAGS_CHUNK_TYPE {
                 println!("Tags may be found here!");
+                match std::str::from_utf8(&chunk_data) {
+                  Ok(string) => match JpgReader::parse_tags(string) {
+                    Ok(tags_found) => tags = tags_found,
+                    Err(_) => {}
+                  },
+                  Err(_) => {
+                    println!("This is not an XML chunk of data :(");
+                  }
+                }
               }
             }
             0xD9 => {
@@ -181,11 +229,22 @@ impl Reader for JpgReader {
               break;
             }
             _ => {}
-          }
+          };
           reader_state = JpgReaderState::watingChunkType;
+          byte = JpgReader::next(bytes)?;
         }
       }
     }
     Ok(tags)
+  }
+}
+impl JpgReader {
+  fn parse_tags(xml: &str) -> Result<HashSet<String>, Error> {
+    let xml = xml
+      .split_whitespace()
+      .map(|v: &str| v.to_string() + " ")
+      .collect::<String>();
+    println!("{}", xml);
+    return Ok(HashSet::new());
   }
 }

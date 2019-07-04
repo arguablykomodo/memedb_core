@@ -3,6 +3,7 @@ pub enum Error {
     UnknownFormat,
     UnexpectedEOF,
     WrongFormat,
+    ParserError,
     IOError(std::io::Error),
 }
 
