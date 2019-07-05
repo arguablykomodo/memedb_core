@@ -30,7 +30,7 @@ use std::io::{Bytes, Read};
 */
 enum JpgReaderState {
   watingChunkType,
-  recordChunkData(u16), //Data length
+  recordingChunkData(u16), //Data length
   watingChunkLength,
   processChunk,
 }
@@ -53,115 +53,6 @@ impl Reader for JpgReader {
     let mut byte = JpgReader::next(bytes)?;
     let mut chunk_data: Vec<u8> = vec![];
     loop {
-      /* if 0xFF == byte {
-        let chunk_type = JpgReader::next(bytes)?;
-        let mut chunk_size: u16;
-        let mut is_tags_chunk = false;
-        println!("------------------------------------------");
-        println!("Byte found: {}", chunk_type);
-        match chunk_type {
-          0xD8 => {
-            println!("Found chunk of 0xD8");
-            chunk_size = 0;
-          }
-          0xC0 => {
-            println!("Found chunk of 0xC0");
-            chunk_size = ((JpgReader::next(bytes)? as u16) << 8) | JpgReader::next(bytes)? as u16;
-          }
-          0xC2 => {
-            println!("Found chunk of 0xC2");
-            chunk_size = ((JpgReader::next(bytes)? as u16) << 8) | JpgReader::next(bytes)? as u16;
-          }
-          0xC4 => {
-            println!("Found chunk of 0xC4");
-            chunk_size = ((JpgReader::next(bytes)? as u16) << 8) | JpgReader::next(bytes)? as u16;
-          }
-          0xDA => {
-            println!("Found chunk of 0xDA\nThe images is stored here");
-            chunk_size = ((JpgReader::next(bytes)? as u16) << 8) | JpgReader::next(bytes)? as u16;
-          }
-          0xDB => {
-            println!("Found chunk of 0xDB");
-            chunk_size = ((JpgReader::next(bytes)? as u16) << 8) | JpgReader::next(bytes)? as u16;
-          }
-          0xDD => {
-            println!("Found chunk of 0xDD");
-            chunk_size = 4;
-          }
-          n @ 0xD0...0xD7 => {
-            println!("Found chunk of 0x{:02X}", n);
-            chunk_size = 0;
-          }
-          n @ 0xE0...0xEF => {
-            println!("Found chunk of 0x{:02X}", n);
-            if n == 0xE1 {
-              println!("Tags may be found here!");
-              is_tags_chunk = true;
-            }
-            chunk_size = ((JpgReader::next(bytes)? as u16) << 8) | JpgReader::next(bytes)? as u16;
-          }
-          0xFE => {
-            println!("Found chunk of 0xFE");
-            chunk_size = ((JpgReader::next(bytes)? as u16) << 8) | JpgReader::next(bytes)? as u16;
-          }
-          0xD9 => {
-            println!("Found chunk of 0xD9");
-            chunk_size = 0;
-            println!("Finished");
-            break;
-          }
-          _ => {
-            let bytes_around: Vec<u8> = bytes
-              .take(255)
-              .take_while(|b| b.is_ok())
-              .map(|b| b.unwrap())
-              .collect();
-            println!(
-              "Unkown chunk type {:02X} \nNext 255 bytes: {:02X?}",
-              chunk_type, bytes_around
-            );
-            return Err(Error::WrongFormat);
-          }
-        println!(
-          "Skiping {} 0x{0:04X} bytes\n(Actually {} 0x{1:04X}) bytes",
-          chunk_size,
-          chunk_size - 2
-        );
-        chunk_size = chunk_size - 2;
-        let mut skipped_bytes = Vec::with_capacity(chunk_size as usize);
-        while chunk_size > 0 {
-          let byte = JpgReader::next(bytes)?;
-          skipped_bytes.push(byte);
-          chunk_size -= 1;
-        match std::str::from_utf8(&skipped_bytes) {
-          Ok(v) if is_tags_chunk => {
-            println!(
-              "This was read on an APPn marker: '{}'",
-              &v.split_whitespace()
-                .map(|v: &str| { v.to_string() + " " })
-                .collect::<String>()
-            );
-          }
-          Err(_) | Ok(_) => {
-            println!(
-              "These bytes were skipped {:02X?}",
-              //skipped_bytes.iter().take(10).collect::<Vec<&u8>>()
-              skipped_bytes
-            );
-          }
-        };
-      } else {
-        let bytes_around: Vec<u8> = bytes
-          .take(255)
-          .take_while(|b| b.is_ok())
-          .map(|b| b.unwrap())
-          .collect();
-        println!(
-          "Error: Expected FF read {:02X}\nNext 255 bytes: {:02X?}",
-          byte, bytes_around
-        );
-        return Err(Error::WrongFormat);
-      } */
       match reader_state {
         JpgReaderState::watingChunkType if last_byte == 0xFF => {
           println!("Retrieving chunk type");
@@ -185,17 +76,17 @@ impl Reader for JpgReader {
           let next_byte = JpgReader::next(bytes)?;
           if next_byte == 0xFF {
             println!("0-length chunk");
-            reader_state = JpgReaderState::recordChunkData(0);
+            reader_state = JpgReaderState::recordingChunkData(0);
             byte = next_byte;
           } else {
             last_byte = next_byte;
             byte = JpgReader::next(bytes)?;
             let chunk_length = ((last_byte as u16) << 8) | (byte as u16);
             println!("Chunk length: {:04X}", chunk_length);
-            reader_state = JpgReaderState::recordChunkData(chunk_length);
+            reader_state = JpgReaderState::recordingChunkData(chunk_length);
           }
         }
-        JpgReaderState::recordChunkData(length) => {
+        JpgReaderState::recordingChunkData(length) => {
           let length = if length > 0 { length - 2 } else { 0 };
           println!("Storing {:04X} bytes of data", length);
           chunk_data = Vec::with_capacity(length as usize);
@@ -240,11 +131,23 @@ impl Reader for JpgReader {
 }
 impl JpgReader {
   fn parse_tags(xml: &str) -> Result<HashSet<String>, Error> {
-    let xml = xml
+    let tags_list_xml: Vec<String> = vec![];
+    let xml: String = xml
       .split_whitespace()
-      .map(|v: &str| v.to_string() + " ")
+      .map(|v: _| v.to_string() + " ")
+      .map(|v: _| v.replace("<", "\n<"))
+      .collect::<String>()
+      .split("\n")
+      .filter(|v: &&str| v[0..1] == *"<")
+      .map(|v: &str| {
+        println!("{}", &v);
+        if &v[5..v.find(" ").unwrap_or_else(|| v.find(">").unwrap() - 1)] == "Description" {
+          println!(">> {}", &v);
+        }
+        v
+      })
       .collect::<String>();
-    println!("{}", xml);
+    //println!("---\n{}\n----", xml);
     return Ok(HashSet::new());
   }
 }
