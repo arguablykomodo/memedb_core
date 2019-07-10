@@ -1,4 +1,5 @@
 pub mod error;
+mod gif;
 mod png;
 mod reader;
 
