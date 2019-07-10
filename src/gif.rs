@@ -3,15 +3,23 @@ use crate::reader::Reader;
 use std::collections::HashSet;
 use std::io::Read;
 
-const SIGNATURE: &[u8] = &[];
-
 pub struct GifReader {}
 
 impl Reader for GifReader {
     fn read_tags(file: &mut impl Read) -> Result<HashSet<String>, Error> {
-        Ok(HashSet::new())
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+        let mut i = 0;
+
+        // Verify signature
+        if bytes[0..3] != *b"GIF89a" {
+            return Err(Error::UnknownFormat);
+        }
+        i += 6;
+
+        unimplemented!();
     }
     fn write_tags(file: &mut impl Read, tags: &HashSet<String>) -> Result<Vec<u8>, Error> {
-        Ok(vec![])
+        unimplemented!();
     }
 }
