@@ -12,7 +12,7 @@ impl Reader for GifReader {
         let mut i = 0;
 
         // Verify signature
-        if bytes[0..3] != *b"GIF89a" {
+        if bytes[0..5] != *b"GIF89a" {
             return Err(Error::UnknownFormat);
         }
         i += 6;
