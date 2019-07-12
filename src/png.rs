@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn test_read_invalid() {
-        let mut file = File::open("tests/jpg.jpg").unwrap();
+        let mut file = File::open("tests/invalid").unwrap();
         // mem::discriminant magic is used to compare enums without having to implement PartialEq
         assert_eq!(
             std::mem::discriminant(&PngReader::read_tags(&mut file).unwrap_err()),
@@ -138,13 +138,6 @@ mod tests {
     }
 
     #[test]
-    fn test_read_untagged() {
-        let mut file = File::open("tests/untagged.png").unwrap();
-        let tags = HashSet::new();
-        assert_eq!(PngReader::read_tags(&mut file).unwrap(), tags);
-    }
-
-    #[test]
     fn test_read_tagged() {
         let mut file = File::open("tests/tagged.png").unwrap();
         let mut tags = HashSet::new();
@@ -155,10 +148,8 @@ mod tests {
 
     #[test]
     fn test_write_invalid() {
-        let mut file = File::open("tests/jpg.jpg").unwrap();
+        let mut file = File::open("tests/invalid").unwrap();
         let mut tags = HashSet::new();
-        tags.insert("foo".to_owned());
-        tags.insert("bar".to_owned());
         // mem::discriminant magic is used to compare enums without having to implement PartialEq
         assert_eq!(
             std::mem::discriminant(&PngReader::write_tags(&mut file, &tags).unwrap_err()),
@@ -169,23 +160,6 @@ mod tests {
     #[test]
     fn test_write_empty() {
         let mut file = File::open("tests/empty.png").unwrap();
-
-        let mut tags = HashSet::new();
-        tags.insert("foo".to_owned());
-        tags.insert("bar".to_owned());
-
-        let result_bytes = PngReader::write_tags(&mut file, &tags).unwrap();
-
-        let mut test = File::open("tests/tagged.png").unwrap();
-        let mut test_bytes = Vec::new();
-        test.read_to_end(&mut test_bytes).unwrap();
-
-        assert_eq!(result_bytes, test_bytes);
-    }
-
-    #[test]
-    fn test_write_untagged() {
-        let mut file = File::open("tests/untagged.png").unwrap();
 
         let mut tags = HashSet::new();
         tags.insert("foo".to_owned());
