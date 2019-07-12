@@ -149,7 +149,7 @@ mod tests {
     #[test]
     fn test_write_invalid() {
         let mut file = File::open("tests/invalid").unwrap();
-        let mut tags = HashSet::new();
+        let tags = HashSet::new();
         // mem::discriminant magic is used to compare enums without having to implement PartialEq
         assert_eq!(
             std::mem::discriminant(&PngReader::write_tags(&mut file, &tags).unwrap_err()),
