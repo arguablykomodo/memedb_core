@@ -7,11 +7,15 @@ pub struct GifReader {}
 
 impl GifReader {
     fn get_color_table_size(byte: u8) -> usize {
-        let mut size = 0;
-        for i in 0..2 {
-            size += byte >> i & 1 << i;
+        if byte >> 7 & 1 == 0 {
+            0
+        } else {
+            let mut size = 0;
+            for i in 0..2 {
+                size += byte >> i & 1 << i;
+            }
+            3 * 1 << (size + 1)
         }
-        3 * 2 << (size + 1)
     }
 }
 
@@ -54,6 +58,7 @@ impl Reader for GifReader {
                     // Loop through sub-blocks
                     loop {
                         if bytes[i] == 0 {
+                            i += 1;
                             break;
                         }
                         let sub_block_size = bytes[i] as usize;
@@ -66,7 +71,30 @@ impl Reader for GifReader {
 
         unimplemented!();
     }
+
     fn write_tags(file: &mut impl Read, tags: &HashSet<String>) -> Result<Vec<u8>, Error> {
         unimplemented!();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+
+    #[test]
+    fn test_read_invalid() {
+        let mut file = File::open("tests/invalid").unwrap();
+        // mem::discriminant magic is used to compare enums without having to implement PartialEq
+        assert_eq!(
+            std::mem::discriminant(&GifReader::read_tags(&mut file).unwrap_err()),
+            std::mem::discriminant(&Error::UnknownFormat)
+        );
+    }
+
+    #[test]
+    fn test_read_empty() {
+        let mut file = File::open("tests/empty.gif").unwrap();
+        assert_eq!(GifReader::read_tags(&mut file).unwrap(), HashSet::new());
     }
 }
