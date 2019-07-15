@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::reader::Reader;
-
+use crate::xml::{XmlTag, XmlTree};
 use std::collections::HashSet;
 use std::io::{Bytes, Read};
 
@@ -19,7 +19,7 @@ use std::io::{Bytes, Read};
   3. JpgReader reads the next byte
     a. If it is an 0xFF, then this is the start of another chunk.
       Save this value in the var "byte", process this chunk by going to [4]
-    b. Otherwise, it reads the next byte and appends them like this: (FIRST<<8 | SECOND)
+    b. Otherwise, it reads the next byte and appends them like this: FIRST<<8+SECOND (This is a 16 bit big-endian)
 
   4. Finally process the chunk
     a. If the chunk type is 0xEn, then tags may be found here
@@ -47,18 +47,17 @@ impl Reader for JpgReader {
         return Err(Error::UnknownFormat);
       }
     }
-
+    let mut _peekable = bytes.peekable();
     let mut chunk_type = 0x00;
     let mut reader_state = JpgReaderState::WatingChunkType;
     let mut last_byte = *SIGNATURE.last().unwrap();
     let mut byte = JpgReader::next(bytes)?;
     let mut chunk_data: Vec<u8> = vec![];
+    // Main loop, iterate through all the bytes until EOF
     loop {
       match reader_state {
         JpgReaderState::WatingChunkType if last_byte == 0xFF => {
-          println!("Retrieving chunk type");
           chunk_type = byte;
-          println!("Chunk type: {:02X}", chunk_type);
           // If we are in the end of the file, we manually set it to finish the parsing
           reader_state = if chunk_type == 0xD9 {
             JpgReaderState::ProcessChunk
@@ -67,60 +66,65 @@ impl Reader for JpgReader {
           };
         }
         JpgReaderState::WatingChunkType => {
-          println!("Waiting chunk type...");
+          // This justs discards bytes that the parser couldn't understand
           last_byte = byte;
           byte = JpgReader::next(bytes)?;
-          println!("Read byte: {:02X}{:02X?}", last_byte, byte);
         }
         JpgReaderState::WatingChunkLength => {
-          println!("Getting chunk length");
           let next_byte = JpgReader::next(bytes)?;
+          // Detect if the next bytes the start of another chunk or the length of the data
           if next_byte == 0xFF {
-            println!("0-length chunk");
             reader_state = JpgReaderState::RecordingChunkData(0);
             byte = next_byte;
           } else {
             last_byte = next_byte;
             byte = JpgReader::next(bytes)?;
             let chunk_length = ((last_byte as u16) << 8) | (byte as u16);
-            println!("Chunk length: {:04X}", chunk_length);
             reader_state = JpgReaderState::RecordingChunkData(chunk_length);
           }
         }
         JpgReaderState::RecordingChunkData(length) => {
           let length = if length > 0 { length - 2 } else { 0 };
-          println!("Storing {:04X} bytes of data", length);
+          println!("Last recorded data:\n{:02X?}", chunk_data);
           chunk_data = Vec::with_capacity(length as usize);
+          println!("Recording chunk of {0:02X?}/{0} len", length);
           for i in 0..length {
-            chunk_data.push(JpgReader::next(bytes)?);
+            match JpgReader::next(bytes) {
+              Ok(b) => {
+                if b == 0xFF {
+                  println!("Found 0xFF at {:02X}", i);
+                  let skipped: u8 = JpgReader::next(bytes).expect("Error reading lol");
+                  println!("This value was skipped (Must be a 0): {:#?}", skipped);
+                  assert!(skipped == 0xFF || skipped == 0x00);
+                  chunk_data.push(b);
+                  if skipped==0xFF {
+                    chunk_data.push(skipped);
+                  } 
+                } else {
+                  chunk_data.push(b);
+                }
+              }
+              Err(e) => {
+                println!("Error reading. Read upto {} bytes from {}", i, length);
+                println!("Failed with error {:#?}", e);
+                panic!(e);
+              }
+            };
           }
           last_byte = *chunk_data.last().unwrap_or(&last_byte);
           reader_state = JpgReaderState::ProcessChunk;
-          println!("Register states: {:02X} {:02X}", last_byte, byte);
         }
         JpgReaderState::ProcessChunk => {
-          println!("Processing chunk of type {:02X}", chunk_type);
-          match chunk_type {
-            0xE0...0xEF => {
-              println!("Found chunk of 0x{:02X}", chunk_type);
-              if chunk_type == TAGS_CHUNK_TYPE {
-                println!("Tags may be found here!");
-                match std::str::from_utf8(&chunk_data) {
-                  Ok(string) => match JpgReader::parse_tags(string) {
-                    Ok(tags_found) => tags = tags_found,
-                    Err(_) => {}
-                  },
-                  Err(_) => {
-                    println!("This is not an XML chunk of data :(");
-                  }
-                }
+          if chunk_type >= 0xE0 && chunk_type <= 0xEF {
+            if chunk_type == TAGS_CHUNK_TYPE {
+              // Tags may be found here!
+              match std::str::from_utf8(&chunk_data) {
+                Ok(string) => tags = JpgReader::parse_tags(string)?,
+                Err(_) => {} // Not an XML string
               }
             }
-            0xD9 => {
-              println!("Finished parsing");
-              break;
-            }
-            _ => {}
+          } else if chunk_type == 0xD9 {
+            break;
           };
           reader_state = JpgReaderState::WatingChunkType;
           byte = JpgReader::next(bytes)?;
@@ -132,161 +136,29 @@ impl Reader for JpgReader {
 }
 impl JpgReader {
   fn parse_tags(xml: &str) -> Result<HashSet<String>, Error> {
-    Xml::parse(xml.to_string());
-    unimplemented!();
-    /* let mut tags: HashSet<String> = HashSet::new();
-    let xml: String = xml
-      .split_whitespace()
-      .map(|v: _| v.to_string() + " ")
-      .map(|v: _| v.replace("<", "\n<").replace(">", ">\n"))
-      .collect();
-    let mut xml_stack: Vec<_> = Vec::new();
-    let mut current_tag: Option<&str> = None;
-    let mut inside_tag = false;
-    for token in xml.split_whitespace() {
-      let token: &str = token;
-      println!("Token '{}'", token);
-      if token.starts_with("<") {
-        xml_stack.push(token.replace("<", ""));
-        inside_tag = !token.ends_with(">");
-      }
-      if token.starts_with("</") || token.ends_with("/>") {
-        xml_stack.pop();
-        inside_tag = false;
-        continue;
-      }
-      if inside_tag {
-        let data: Vec<&str> = token.split("=").collect();
-        let (key, value): (&&str, &&str) = (data.get(0).unwrap(), data.get(1).unwrap_or(&""));
-        if *value == KEYWORDS_UUID {
-          println!("Wiiiii!!! tags!");
-        } else {
-          println!("<{}> = <{}>", key, value);
-        }
-        continue;
-      }
-      if !inside_tag {
-        let tag_stack_len = xml_stack.len();
-        if xml_stack.len() > 3 && xml_stack[tag_stack_len - 1] == "rdf:Bag" {
-          println!("This is a tag: {}", token);
-          tags.insert(token.to_string());
-        } else {
-          println!("Value: {}", token);
-        }
-      }
-    }
-    return Ok(tags); */
-  }
-}
-
-mod Xml {
-  #[derive(PartialEq)]
-  enum XmlParserState {
-    WaitingTag,
-    ReadingTagProps,
-    ReadingTagValues,
-  }
-  #[derive(Debug)]
-  struct XmlTag {
-    name: String,
-    props: Vec<String>,
-    values: Vec<String>,
-    children: Vec<XmlTag>,
-  }
-  pub fn parse(text: String) {
-    let tokens: _ = text
-      .replace("<", "\n<") // These 3 add whitespaces around the start and end of the tags so they can be easily split with the next function
-      .replace(">", " >\n") // like this: <rdf::RDF> --> \n<rdf:RDF\s>\n
-      .replace("/ >", " />") // transform /\s> into \s/>
-      .split_ascii_whitespace()
-      .skip_while(|v| *v != "<rdf:RDF") // Skip untl the begining of the file
-      .map(|v: &str| v.to_string()) // Transform everything into Strings
-      .collect::<Vec<String>>();
-    println!("{:#?}", tokens);
-    let mut tag_stack: Vec<XmlTag> = vec![];
-    let mut processing_tag: Option<XmlTag> = None;
-    let mut parser_state = XmlParserState::WaitingTag;
-
-    let mut tokens_iter: std::iter::Peekable<_> = tokens.into_iter().peekable();
-    loop {
-      let peeked: &String = match tokens_iter.peek() {
-        Some(v) => v,
-        None => break,
-      };
-      if peeked.starts_with("<") {
-        let tag = parse_tag(&mut tokens_iter);
-        println!("Tag: {}", tag);
-      } else {
-        println!("OwO, whats dis: {}", peeked);
-        tokens_iter.next();
-      }
-    }
-    /*for token in tokens {
-      let token: String = token;
-      if token.starts_with("<") {
-        if processing_tag.is_some() {
-          tag_stack.push(processing_tag.unwrap());
-          processing_tag = None;
-        }
-        processing_tag = Some(XmlTag {
-          name: token
-            .trim_matches(|c| c == '<' || c == '>' || c == '/')
-            .to_string(),
-          props: vec![],
-          values: vec![],
-          children: vec![],
-        });
-
-        if token.ends_with("/>") {
-          parser_state = XmlParserState::WaitingTag;
-          tag_stack.push(processing_tag.unwrap());
-          processing_tag = None;
-        } else if token.ends_with(">") || token.starts_with("<") {
-          parser_state = XmlParserState::ReadingTagValues;
-          tag_stack.push(processing_tag.unwrap());
-          processing_tag = None;
-        } else {
-          parser_state = XmlParserState::ReadingTagProps;
-        }
-      }
-      if token.ends_with(">") {
-        if token.ends_with("/>") {
-          parser_state = XmlParserState::WaitingTag;
-        } else {
-          parser_state = XmlParserState::ReadingTagValues;
-        }
-      }
-      if !token.starts_with("<") && !token.ends_with(">") {
-        if token == "pepe" {
-          println!("lol");
-        }
-        if parser_state == XmlParserState::ReadingTagProps {
-          match processing_tag {
-            Some(ref mut v) => v.props.push(token),
-            _ => {}
+    let tree = XmlTree::parse(xml.to_string())?;
+    let finds = tree.find_elements(|e: &XmlTag| match e.attributes.get("rdf:about") {
+      Some(v) => v == KEYWORDS_UUID,
+      None => false,
+    });
+    let mut tags: HashSet<String> = HashSet::new();
+    for i in &finds {
+      tree.traverse_map(
+        *i,
+        |tag: &XmlTag, tags: &mut HashSet<String>| {
+          if tag.name == "rdf:li" {
+            match &tag.value {
+              Some(value) => {
+                tags.insert(value.clone());
+              }
+              None => {}
+            };
           }
-        } else if parser_state == XmlParserState::ReadingTagValues {
-          tag_stack.last_mut().unwrap().values.push(token);
-        }
-      }
-    }*/
-    println!("{:#?}", tag_stack);
-  }
-  fn parse_tag<T>(iter: T) -> String
-  where
-    T: Iterator<Item = String>,
-  {
-    let mut full_tag = String::from("");
-    let mut last_token_read = String::from("");
-    for token in iter.take_while(|v| {
-      last_token_read = v.to_string();
-      !v.ends_with(">")
-    }) {
-      full_tag += " ";
-      full_tag += &token;
+          tags
+        },
+        &mut tags,
+      );
     }
-    full_tag += &last_token_read;
-
-    return full_tag;
+    Ok(tags)
   }
 }
