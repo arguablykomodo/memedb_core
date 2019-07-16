@@ -1,6 +1,7 @@
 pub mod error;
 mod gif;
 mod png;
+mod jpg;
 
 mod reader;
 mod xml;
@@ -17,6 +18,7 @@ pub fn read_tags(path: String) -> Result<TagSet, Error> {
     match path.split(".").last().unwrap() {
         "png" => png::PngReader::read_tags(&mut file),
         "gif" => gif::GifReader::read_tags(&mut file),
+        "jpg" | "jpeg" => jpg::JpgReader::read_tags(&mut file),
         _ => Err(Error::UnknownFormat),
     }
 }

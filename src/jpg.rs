@@ -40,18 +40,18 @@ enum JpgReaderState {
 }
 pub struct JpgReader;
 impl Reader for JpgReader {
-  fn read_tags(bytes: &mut Bytes<impl Read>) -> Result<HashSet<String>, Error> {
+  fn read_tags(file: &mut impl Read) -> Result<HashSet<String>, Error> {
     let mut tags: HashSet<String> = HashSet::new();
+    let mut bytes: std::iter::Peekable<_> = file.bytes().peekable();
     for byte in SIGNATURE.iter() {
-      if *byte != JpgReader::next(bytes)? {
+      if *byte != bytes.next().unwrap()? {
         return Err(Error::UnknownFormat);
       }
     }
-    let mut _peekable = bytes.peekable();
     let mut chunk_type = 0x00;
     let mut reader_state = JpgReaderState::WatingChunkType;
+    let mut byte = 0xFF;
     let mut last_byte = *SIGNATURE.last().unwrap();
-    let mut byte = JpgReader::next(bytes)?;
     let mut chunk_data: Vec<u8> = vec![];
     // Main loop, iterate through all the bytes until EOF
     loop {
@@ -68,17 +68,17 @@ impl Reader for JpgReader {
         JpgReaderState::WatingChunkType => {
           // This justs discards bytes that the parser couldn't understand
           last_byte = byte;
-          byte = JpgReader::next(bytes)?;
+          byte = bytes.next().unwrap()?;
         }
         JpgReaderState::WatingChunkLength => {
-          let next_byte = JpgReader::next(bytes)?;
+          let next_byte = bytes.next().unwrap()?;
           // Detect if the next bytes the start of another chunk or the length of the data
           if next_byte == 0xFF {
             reader_state = JpgReaderState::RecordingChunkData(0);
             byte = next_byte;
           } else {
             last_byte = next_byte;
-            byte = JpgReader::next(bytes)?;
+            byte = bytes.next().unwrap()?;
             let chunk_length = ((last_byte as u16) << 8) | (byte as u16);
             reader_state = JpgReaderState::RecordingChunkData(chunk_length);
           }
@@ -89,17 +89,20 @@ impl Reader for JpgReader {
           chunk_data = Vec::with_capacity(length as usize);
           println!("Recording chunk of {0:02X?}/{0} len", length);
           for i in 0..length {
-            match JpgReader::next(bytes) {
+            match bytes.next().unwrap() {
               Ok(b) => {
                 if b == 0xFF {
                   println!("Found 0xFF at {:02X}", i);
-                  let skipped: u8 = JpgReader::next(bytes).expect("Error reading lol");
-                  println!("This value was skipped (Must be a 0): {:#?}", skipped);
+                  let skipped: u8 = bytes.next().expect("Error reading lol")?;
+                  println!(
+                    "This value was skipped (Must be a 0 or 0xFF): {:02X}",
+                    skipped
+                  );
                   assert!(skipped == 0xFF || skipped == 0x00);
                   chunk_data.push(b);
-                  if skipped==0xFF {
+                  if skipped == 0xFF {
                     chunk_data.push(skipped);
-                  } 
+                  }
                 } else {
                   chunk_data.push(b);
                 }
@@ -127,11 +130,14 @@ impl Reader for JpgReader {
             break;
           };
           reader_state = JpgReaderState::WatingChunkType;
-          byte = JpgReader::next(bytes)?;
+          byte = bytes.next().unwrap()?;
         }
       }
     }
     Ok(tags)
+  }
+  fn write_tags(file: &mut impl Read, tags: &HashSet<String>) -> Result<Vec<u8>, Error> {
+    unimplemented!("Sorry dude, I can't do that yet");
   }
 }
 impl JpgReader {
