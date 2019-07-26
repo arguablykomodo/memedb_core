@@ -1,10 +1,9 @@
 pub mod error;
-mod gif;
-mod png;
 mod jpg;
-
+mod png;
 mod reader;
 mod xml;
+
 use error::Error;
 use reader::Reader;
 use std::collections::HashSet;
