@@ -10,10 +10,7 @@ impl GifReader {
         if byte >> 7 & 1 == 0 {
             0
         } else {
-            let mut size = 0;
-            for i in 0..2 {
-                size += byte >> i & 1 << i;
-            }
+            let size = byte & 0b00000111;
             3 * 1 << (size + 1)
         }
     }
@@ -41,35 +38,58 @@ impl Reader for GifReader {
         loop {
             match bytes[i] {
                 // Trailer, signifies end of file
-                0x3B => {
-                    break;
-                }
+                0x3B => return Err(Error::UnexpectedEOF),
                 // Extension block
                 0x21 => {
-                    println!("Extension block: {:X}", bytes[i + 1]);
-                    let data_size = bytes[i + 2] as usize;
-                    i += 3 + data_size + 1;
-                }
-                // Image Block
-                0x2C => {
-                    let color_table_size = GifReader::get_color_table_size(bytes[i + 9]);
-                    i += 10 + color_table_size + 1;
+                    let label = bytes[i + 1];
+                    let size = bytes[i + 2] as usize;
+                    let data = &bytes[i + 3..i + 3 + size];
+                    i += 3 + size;
 
-                    // Loop through sub-blocks
+                    if label == 0xFF && data == b"MEMETAGS1.0" {
+                        let mut tags = HashSet::new();
+                        loop {
+                            if bytes[i] == 0 {
+                                return Ok(tags);
+                            }
+                            let sub_block_size = bytes[i] as usize;
+                            tags.insert(
+                                String::from_utf8_lossy(&bytes[i..i + sub_block_size]).to_string(),
+                            );
+                            i += sub_block_size + 1;
+                        }
+                    }
+
                     loop {
                         if bytes[i] == 0 {
                             i += 1;
                             break;
                         }
                         let sub_block_size = bytes[i] as usize;
-                        i += sub_block_size;
+                        i += sub_block_size + 1;
                     }
                 }
-                _ => {}
+                // Image Block
+                0x2C => {
+                    let color_table_size = GifReader::get_color_table_size(bytes[i + 9]);
+                    i += 10;
+
+                    i += color_table_size;
+
+                    // Loop through sub-blocks
+                    i += 1;
+                    loop {
+                        if bytes[i] == 0 {
+                            i += 1;
+                            break;
+                        }
+                        let sub_block_size = bytes[i] as usize;
+                        i += sub_block_size + 1;
+                    }
+                }
+                _ => return Err(Error::UnknownFormat),
             };
         }
-
-        unimplemented!();
     }
 
     fn write_tags(file: &mut impl Read, tags: &HashSet<String>) -> Result<Vec<u8>, Error> {
