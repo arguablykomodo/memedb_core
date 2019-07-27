@@ -1,6 +1,7 @@
 use crate::error::Error;
 use crate::reader::Reader;
 use crate::xml::{XmlTag, XmlTree};
+use crate::TagSet;
 use colored::*;
 use std::collections::HashSet;
 use std::io::Read;
@@ -8,10 +9,9 @@ use std::iter::Peekable;
 use std::time::SystemTime;
 
 const SIGNATURE: &[u8] = &[0xFF, 0xD8];
-const TAGS_CHUNK_TYPE: u8 = 0xE1;
+const TAGS_CHUNK_TYPE: u8 = 0x68;
+const EOF_CHUNK_TYPE: u8 = 0xD9;
 const KEYWORDS_UUID: &str = "\"uuid:faf5bdd5-ba3d-11da-ad31-d33d75182f1b\"";
-
-type TagSet = HashSet<String>;
 
 #[allow(unused_macros)]
 macro_rules! read {
@@ -77,7 +77,7 @@ impl Reader for JpgReader {
         if chunk_type == 0x00 {
           //eprintln!("{}", "Skipping 0xFF inside chunk data".yellow());
           continue;
-        } else if chunk_type == 0xD9 {
+        } else if chunk_type == EOF_CHUNK_TYPE {
           //println!("{}", "EOF".green());
           break;
         }
@@ -87,7 +87,7 @@ impl Reader for JpgReader {
         }
         chunk_length = JpgReader::get_chunk_length(&mut file_iterator_ref)?;
         //println!("Chunk length: {:#06X?}", chunk_length);
-        if read!(file_iterator_ref;peek) == Some(0x68) {
+        if read!(file_iterator_ref;peek) == Some(TAGS_CHUNK_TYPE) {
           let chunk_data = JpgReader::get_chunk_data(&mut file_iterator_ref, chunk_length)?;
           let chunk_string = String::from_utf8(chunk_data)
             .ok()
