@@ -11,6 +11,8 @@ const SIGNATURE: &[u8] = &[0xFF, 0xD8];
 const TAGS_CHUNK_TYPE: u8 = 0xE1;
 const KEYWORDS_UUID: &str = "\"uuid:faf5bdd5-ba3d-11da-ad31-d33d75182f1b\"";
 
+type TagSet = HashSet<String>;
+
 #[allow(unused_macros)]
 macro_rules! read {
   ($i:ident) => {
@@ -42,9 +44,9 @@ macro_rules! read {
 
 pub struct JpgReader;
 impl Reader for JpgReader {
-  fn read_tags(file: &mut impl Read) -> Result<HashSet<String>, Error> {
+  fn read_tags(file: &mut impl Read) -> Result<TagSet, Error> {
     let started = SystemTime::now();
-    let mut tags: HashSet<String> = HashSet::new();
+    let mut tags: TagSet = HashSet::new();
     let mut file_iterator: Peekable<_> = file
       .bytes()
       /* .enumerate()
@@ -110,7 +112,7 @@ impl Reader for JpgReader {
     println!("Time elapsed: {:#?}", started.elapsed().unwrap());
     Ok(tags)
   }
-  fn write_tags(file: &mut impl Read, tags: &HashSet<String>) -> Result<Vec<u8>, Error> {
+  fn write_tags(file: &mut impl Read, tags: &TagSet) -> Result<Vec<u8>, Error> {
     unimplemented!("Sorry dude, I can't do that yet");
   }
 }
@@ -150,17 +152,17 @@ impl JpgReader {
       return Ok(chunk_data);
     }
   }
-  fn parse_xml(xml: &str) -> Result<HashSet<String>, Error> {
+  fn parse_xml(xml: &str) -> Result<TagSet, Error> {
     let tree = XmlTree::parse(xml.to_string())?;
     let finds = tree.find_elements(|e: &XmlTag| match e.attributes.get("rdf:about") {
       Some(v) => v == KEYWORDS_UUID,
       None => false,
     });
-    let mut tags: HashSet<String> = HashSet::new();
+    let mut tags: TagSet = HashSet::new();
     for i in &finds {
       tree.traverse_map(
         *i,
-        |tag: &XmlTag, tags: &mut HashSet<String>| {
+        |tag: &XmlTag, tags: &mut TagSet| {
           if tag.name == "rdf:li" {
             match &tag.value {
               Some(value) => {
@@ -175,5 +177,39 @@ impl JpgReader {
       );
     }
     Ok(tags)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::fs::File;
+
+  #[test]
+  fn test_read_invalid() {
+    let mut file = File::open("tests/invalid").unwrap();
+    assert_eq!(
+      std::mem::discriminant(&JpgReader::read_tags(&mut file).unwrap_err()),
+      std::mem::discriminant(&Error::UnknownFormat)
+    );
+  }
+
+  #[test]
+  fn test_read_empty() {
+    let mut file = File::open("tests/empty.jpeg").unwrap();
+    let tags: Result<TagSet, Error> = JpgReader::read_tags(&mut file);
+    assert!(tags.is_ok());
+    let tags: TagSet = tags.unwrap();
+    assert!(tags.is_empty());
+  }
+
+  #[test]
+  fn test_read_tagged() {
+    let mut file = File::open("tests/tagged.jpg").unwrap();
+    let tags: Result<TagSet, Error> = JpgReader::read_tags(&mut file);
+    assert!(tags.is_ok());
+    let tags: TagSet = tags.unwrap();
+    assert!(tags.contains("pepe"));
+    assert!(tags.contains("fefe"));
   }
 }
