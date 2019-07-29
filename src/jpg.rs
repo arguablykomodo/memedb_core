@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::log::{debug, error, info, warn};
 use crate::reader::Reader;
 use crate::xml::{XmlTag, XmlTree};
 use crate::TagSet;
@@ -6,14 +7,49 @@ use colored::*;
 use std::collections::HashSet;
 use std::io::Read;
 use std::iter::Peekable;
-use std::time::SystemTime;
 
 const SIGNATURE: &[u8] = &[0xFF, 0xD8];
 const TAGS_CHUNK_TYPE: u8 = 0x68;
 const EOF_CHUNK_TYPE: u8 = 0xD9;
 const KEYWORDS_UUID: &str = "\"uuid:faf5bdd5-ba3d-11da-ad31-d33d75182f1b\"";
 
-#[allow(unused_macros)]
+/* #region Debugging tools */
+#[cfg(logAddresses)]
+mod log_address {
+  use std::iter::*;
+
+  pub trait LogAddress<Item, I: Iterator<Item = Item>> {
+    fn log<'a>(self) -> Map<Enumerate<I>, &'a Fn((usize, Item)) -> Item>;
+  }
+
+  impl<Item, I> LogAddress<Item, I> for I
+  where
+    I: Iterator<Item = Item>,
+  {
+    fn log<'a>(self) -> Map<Enumerate<I>, &'a Fn((usize, Item)) -> Item> {
+      self.enumerate().map(&|(a, v)| {
+        debug!("Address: 0x{:06X?}", a);
+        v
+      })
+    }
+  }
+}
+#[cfg(not(logAddresses))]
+mod log_address {
+  pub trait LogAddress<I: Iterator> {
+    fn log<'a>(self) -> I;
+  }
+  impl<I> LogAddress<I> for I
+  where
+    I: Iterator,
+  {
+    fn log<'a>(self) -> I {
+      self
+    }
+  }
+}
+/* #endregion */
+
 macro_rules! read {
   ($i:ident) => {
     match $i.next() {
@@ -45,16 +81,9 @@ macro_rules! read {
 pub struct JpgReader;
 impl Reader for JpgReader {
   fn read_tags(file: &mut impl Read) -> Result<TagSet, Error> {
-    let started = SystemTime::now();
+    use log_address::LogAddress;
     let mut tags: TagSet = HashSet::new();
-    let mut file_iterator: Peekable<_> = file
-      .bytes()
-      /* .enumerate()
-      .map(|(a, v)| {
-        println!("Req: {:#06X}", a);
-        v
-      }) */
-      .peekable();
+    let mut file_iterator: Peekable<_> = file.bytes().log().peekable();
     for byte in SIGNATURE.iter() {
       if *byte != read!(file_iterator)? {
         return Err(Error::UnknownFormat);
@@ -73,43 +102,49 @@ impl Reader for JpgReader {
       };
       if peeked == 0xFF {
         chunk_type = read!(file_iterator_ref)?;
-        //println!("Chunk header: {:#02X?}", chunk_header);
+        info!("Chunk type: {:#02X?}", chunk_type);
         if chunk_type == 0x00 {
           //eprintln!("{}", "Skipping 0xFF inside chunk data".yellow());
           continue;
         } else if chunk_type == EOF_CHUNK_TYPE {
-          //println!("{}", "EOF".green());
+          info!("{}", "EOF".green());
           break;
         }
         if read!(file_iterator_ref;peek) == Some(0xFF) {
-          //println!("Peeked the start of another chunk");
+          info!("Peeked the start of another chunk");
           continue;
         }
         chunk_length = JpgReader::get_chunk_length(&mut file_iterator_ref)?;
         //println!("Chunk length: {:#06X?}", chunk_length);
         if read!(file_iterator_ref;peek) == Some(TAGS_CHUNK_TYPE) {
           let chunk_data = JpgReader::get_chunk_data(&mut file_iterator_ref, chunk_length)?;
-          let chunk_string = String::from_utf8(chunk_data)
-            .ok()
-            .unwrap_or(":(".to_string());
-          //println!("{}", chunk_string);
+          let chunk_string = match String::from_utf8(chunk_data) {
+            Ok(v) => v,
+            Err(e) => {
+              error!(
+                "Chunk data wasn't an XML (Failed with error {:#?})",
+                format!("{:?}", e).red()
+              );
+              continue;
+            }
+          };
+          info!("This is the XMl found: '{}'", chunk_string.yellow());
           match JpgReader::parse_xml(&chunk_string) {
-            Ok(t) => tags = t,
+            Ok(t) => {
+              tags = t;
+              break;
+            }
             Err(e) => eprintln!("Xml parser error {}", format!("{:?}", e).red()),
           }
         } else {
           //println!("Skipping {} bytes", chunk_length);
-          for _ in 0..chunk_length {
-            read!(file_iterator_ref)?;
-          }
+          file_iterator_ref.skip(chunk_length - 1).next();
         }
       } else {
-        //println!("{}", format!("0xFF expected, got {:#02X?}", peeked).red());
         file_iterator_ref.next();
-        //std::thread::sleep(std::time::Duration::from_secs(2));
+        error!("Skipping bytes");
       }
     }
-    println!("Time elapsed: {:#?}", started.elapsed().unwrap());
     Ok(tags)
   }
   fn write_tags(file: &mut impl Read, tags: &TagSet) -> Result<Vec<u8>, Error> {
@@ -145,7 +180,7 @@ impl JpgReader {
         .red()
       );
       return match read!(file_iterator) {
-        Ok(v) => Err(Error::ParserError),
+        Ok(_) => Err(Error::ParserError),
         Err(e) => Err(e),
       };
     } else {

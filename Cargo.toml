@@ -4,5 +4,8 @@ version = "0.1.0"
 authors = ["SrKomodo", "PeronTheDuck"]
 edition = "2018"
 
+# Turn off logs on relase builds, but enable erros,warnings,info and debug in any other case 
 [dependencies]
-colored = "1.8.0"
+colored = "^1.8.0"
+log = {version="^0.4.0",features=["release_max_level_off","max_level_debug"],default-features=false}
+env_logger = "^0.6.0"
