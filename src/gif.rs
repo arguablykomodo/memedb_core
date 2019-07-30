@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::reader::Reader;
-use std::collections::HashSet;
+use crate::TagSet;
 use std::io::Read;
 
 pub struct GifReader {}
@@ -17,7 +17,7 @@ impl GifReader {
 }
 
 impl Reader for GifReader {
-    fn read_tags(file: &mut impl Read) -> Result<HashSet<String>, Error> {
+    fn read_tags(file: &mut impl Read) -> Result<TagSet, Error> {
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)?;
         let mut i: usize = 0;
@@ -47,7 +47,7 @@ impl Reader for GifReader {
                     i += 3 + size;
 
                     if label == 0xFF && data == b"MEMETAGS1.0" {
-                        let mut tags = HashSet::new();
+                        let mut tags = TagSet::new();
                         loop {
                             if bytes[i] == 0 {
                                 return Ok(tags);
@@ -92,7 +92,7 @@ impl Reader for GifReader {
         }
     }
 
-    fn write_tags(file: &mut impl Read, tags: &HashSet<String>) -> Result<Vec<u8>, Error> {
+    fn write_tags(file: &mut impl Read, tags: &TagSet) -> Result<Vec<u8>, Error> {
         unimplemented!();
     }
 }
@@ -115,6 +115,6 @@ mod tests {
     #[test]
     fn test_read_empty() {
         let mut file = File::open("tests/empty.gif").unwrap();
-        assert_eq!(GifReader::read_tags(&mut file).unwrap(), HashSet::new());
+        assert_eq!(GifReader::read_tags(&mut file).unwrap(), TagSet::new());
     }
 }
