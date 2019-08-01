@@ -9,7 +9,7 @@ use std::io::Read;
 use std::iter::Peekable;
 
 const SIGNATURE: &[u8] = &[0xFF, 0xD8];
-const TAGS_CHUNK_TYPE: u8 = 0x68;
+const TAGS_CHUNK_TYPE: u8 = 0xE1;
 const EOF_CHUNK_TYPE: u8 = 0xD9;
 const KEYWORDS_UUID: &str = "\"uuid:faf5bdd5-ba3d-11da-ad31-d33d75182f1b\"";
 
@@ -102,6 +102,10 @@ impl Reader for JpgReader {
       };
       if peeked == 0xFF {
         chunk_type = read!(file_iterator_ref)?;
+        if read!(file_iterator_ref;peek) == Some(0xFF) {
+          info!("Peeked the start of another chunk");
+          continue;
+        }
         info!("Chunk type: {:#02X?}", chunk_type);
         if chunk_type == 0x00 {
           //eprintln!("{}", "Skipping 0xFF inside chunk data".yellow());
@@ -109,15 +113,9 @@ impl Reader for JpgReader {
         } else if chunk_type == EOF_CHUNK_TYPE {
           info!("{}", "EOF".green());
           break;
-        }
-        if read!(file_iterator_ref;peek) == Some(0xFF) {
-          info!("Peeked the start of another chunk");
-          continue;
-        }
-        chunk_length = JpgReader::get_chunk_length(&mut file_iterator_ref)?;
-        //println!("Chunk length: {:#06X?}", chunk_length);
-        if read!(file_iterator_ref;peek) == Some(TAGS_CHUNK_TYPE) {
-          let chunk_data = JpgReader::get_chunk_data(&mut file_iterator_ref, chunk_length)?;
+        // This guard checks if the data at least starts with an 'h' (as in "http://ns.adobe.com/xap/1.0/")
+        } else if chunk_type == TAGS_CHUNK_TYPE && read!(file_iterator_ref;peek) != Some(0x68) {
+          let chunk_data = JpgReader::get_chunk_data(&mut file_iterator_ref)?;
           let chunk_string = match String::from_utf8(chunk_data) {
             Ok(v) => v,
             Err(e) => {
@@ -128,17 +126,16 @@ impl Reader for JpgReader {
               continue;
             }
           };
-          info!("This is the XMl found: '{}'", chunk_string.yellow());
+          info!("This is the XML found: '{}'", chunk_string.yellow());
           match JpgReader::parse_xml(&chunk_string) {
             Ok(t) => {
               tags = t;
               break;
             }
-            Err(e) => eprintln!("Xml parser error {}", format!("{:?}", e).red()),
+            Err(e) => eprintln!("XML parser error {}", format!("{:?}", e).red()),
           }
         } else {
-          //println!("Skipping {} bytes", chunk_length);
-          file_iterator_ref.skip(chunk_length - 1).next();
+          JpgReader::skip_chunk_data(&mut file_iterator_ref)?;
         }
       } else {
         file_iterator_ref.next();
@@ -152,19 +149,10 @@ impl Reader for JpgReader {
   }
 }
 impl JpgReader {
-  fn get_chunk_length(
-    file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, std::io::Error>>>,
-  ) -> Result<usize, Error> {
-    let mut chunk_length = 0x0000;
-    chunk_length |= (read!(file_iterator)? as usize) << 8;
-    chunk_length |= read!(file_iterator)? as usize;
-    chunk_length -= 2;
-    return Ok(chunk_length);
-  }
   fn get_chunk_data(
-    file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, std::io::Error>>>,
-    chunk_length: usize,
+    mut file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, std::io::Error>>>,
   ) -> Result<Vec<u8>, Error> {
+    let chunk_length: usize = JpgReader::get_chunk_length(&mut file_iterator)?;
     let chunk_data: Vec<u8> = file_iterator
       .take(chunk_length)
       .map(|v| v.unwrap())
@@ -187,6 +175,27 @@ impl JpgReader {
       return Ok(chunk_data);
     }
   }
+  fn skip_chunk_data(
+    mut file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, std::io::Error>>>,
+  ) -> Result<(), Error> {
+    let chunk_length: usize = JpgReader::get_chunk_length(&mut file_iterator)?;
+    for _ in 0..chunk_length {
+      match file_iterator.next() {
+        Some(v) => v?,
+        None => return Err(Error::UnexpectedEOF),
+      };
+    }
+    Ok(())
+  }
+  fn get_chunk_length(
+    file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, std::io::Error>>>,
+  ) -> Result<usize, Error> {
+    let mut chunk_length = 0x0000;
+    chunk_length |= (read!(file_iterator)? as usize) << 8;
+    chunk_length |= read!(file_iterator)? as usize;
+    chunk_length -= 2;
+    return Ok(chunk_length);
+  }
   fn parse_xml(xml: &str) -> Result<TagSet, Error> {
     let tree = XmlTree::parse(xml.to_string())?;
     let finds = tree.find_elements(|e: &XmlTag| match e.attributes.get("rdf:about") {
@@ -201,7 +210,7 @@ impl JpgReader {
           if tag.name == "rdf:li" {
             match &tag.value {
               Some(value) => {
-                tags.insert(value.clone());
+                tags.insert(value.to_string());
               }
               None => {}
             };
