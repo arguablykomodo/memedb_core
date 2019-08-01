@@ -14,12 +14,8 @@ impl GifReader {
             3 * 1 << (size + 1)
         }
     }
-}
 
-impl Reader for GifReader {
-    fn read_tags(file: &mut impl Read) -> Result<TagSet, Error> {
-        let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes)?;
+    fn find_tags(bytes: &Vec<u8>) -> Result<isize, Error> {
         let mut i: usize = 0;
 
         // Verify signature
@@ -38,7 +34,7 @@ impl Reader for GifReader {
         loop {
             match bytes[i] {
                 // Trailer, signifies end of file
-                0x3B => return Err(Error::UnexpectedEOF),
+                0x3B => return Ok(-1),
                 // Extension block
                 0x21 => {
                     let label = bytes[i + 1];
@@ -47,17 +43,7 @@ impl Reader for GifReader {
                     i += 3 + size;
 
                     if label == 0xFF && data == b"MEMETAGS1.0" {
-                        let mut tags = TagSet::new();
-                        loop {
-                            if bytes[i] == 0 {
-                                return Ok(tags);
-                            }
-                            let sub_block_size = bytes[i] as usize;
-                            tags.insert(
-                                String::from_utf8_lossy(&bytes[i..i + sub_block_size]).to_string(),
-                            );
-                            i += sub_block_size + 1;
-                        }
+                        return Ok(i as isize);
                     }
 
                     loop {
@@ -91,9 +77,58 @@ impl Reader for GifReader {
             };
         }
     }
+}
+
+impl Reader for GifReader {
+    fn read_tags(file: &mut impl Read) -> Result<TagSet, Error> {
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+
+        let i = GifReader::find_tags(&bytes)?;
+        let mut tags = TagSet::new();
+        if i == -1 {
+            return Ok(tags);
+        } else {
+            let mut i = i as usize;
+            loop {
+                if bytes[i] == 0 {
+                    return Ok(tags);
+                }
+                let sub_block_size = bytes[i] as usize;
+                tags.insert(String::from_utf8_lossy(&bytes[i..i + sub_block_size]).to_string());
+                i += sub_block_size + 1;
+            }
+        }
+    }
 
     fn write_tags(file: &mut impl Read, tags: &TagSet) -> Result<Vec<u8>, Error> {
-        unimplemented!();
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+
+        let mut tags: Vec<String> = tags.iter().cloned().collect();
+        tags.sort_unstable();
+        let mut tag_bytes = Vec::new();
+        for tag in &mut tags {
+            tag_bytes.push(tag.len() as u8);
+            tag_bytes.append(&mut tag.as_bytes().into_iter().cloned().collect());
+        }
+        tag_bytes.push(0);
+
+        let i = GifReader::find_tags(&bytes)?;
+        if i == -1 {
+            unimplemented!();
+        } else {
+            let mut i = i as usize;
+            let start = i;
+            loop {
+                if bytes[i] == 0 {
+                    bytes.splice(start..i, tag_bytes);
+                    return Ok(bytes);
+                }
+                let sub_block_size = bytes[i] as usize;
+                i += sub_block_size + 1;
+            }
+        }
     }
 }
 
