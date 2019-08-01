@@ -34,7 +34,7 @@ impl GifReader {
         loop {
             match bytes[i] {
                 // Trailer, signifies end of file
-                0x3B => return Ok((i - 1, false)),
+                0x3B => return Ok((i, false)),
                 // Extension block
                 0x21 => {
                     let label = bytes[i + 1];
@@ -115,7 +115,11 @@ impl Reader for GifReader {
 
         let (mut i, found) = GifReader::find_tags(&bytes)?;
         if !found {
-            bytes.splice(i..i, tag_bytes);
+            let mut real_bytes = vec![
+                0x21, 0xFF, 0x0B, b'M', b'E', b'M', b'E', b'T', b'A', b'G', b'S', b'1', b'.', b'0',
+            ];
+            real_bytes.append(&mut tag_bytes);
+            bytes.splice(i..i, real_bytes);
             return Ok(bytes);
         } else {
             let start = i;
