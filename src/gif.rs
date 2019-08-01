@@ -15,7 +15,7 @@ impl GifReader {
         }
     }
 
-    fn find_tags(bytes: &Vec<u8>) -> Result<isize, Error> {
+    fn find_tags(bytes: &Vec<u8>) -> Result<(usize, bool), Error> {
         let mut i: usize = 0;
 
         // Verify signature
@@ -34,7 +34,7 @@ impl GifReader {
         loop {
             match bytes[i] {
                 // Trailer, signifies end of file
-                0x3B => return Ok(-1),
+                0x3B => return Ok((i - 1, false)),
                 // Extension block
                 0x21 => {
                     let label = bytes[i + 1];
@@ -43,7 +43,7 @@ impl GifReader {
                     i += 3 + size;
 
                     if label == 0xFF && data == b"MEMETAGS1.0" {
-                        return Ok(i as isize);
+                        return Ok((i, true));
                     }
 
                     loop {
@@ -84,12 +84,11 @@ impl Reader for GifReader {
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)?;
 
-        let i = GifReader::find_tags(&bytes)?;
+        let (mut i, found) = GifReader::find_tags(&bytes)?;
         let mut tags = TagSet::new();
-        if i == -1 {
+        if !found {
             return Ok(tags);
         } else {
-            let mut i = i as usize;
             loop {
                 if bytes[i] == 0 {
                     return Ok(tags);
@@ -114,11 +113,11 @@ impl Reader for GifReader {
         }
         tag_bytes.push(0);
 
-        let i = GifReader::find_tags(&bytes)?;
-        if i == -1 {
-            unimplemented!();
+        let (mut i, found) = GifReader::find_tags(&bytes)?;
+        if !found {
+            bytes.splice(i..i, tag_bytes);
+            return Ok(bytes);
         } else {
-            let mut i = i as usize;
             let start = i;
             loop {
                 if bytes[i] == 0 {
