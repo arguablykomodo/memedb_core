@@ -81,8 +81,8 @@ macro_rules! read {
 pub struct JpgReader;
 impl Reader for JpgReader {
   fn read_tags(file: &mut impl Read) -> Result<TagSet, Error> {
-    use log_address::LogAddress;
     let mut tags: TagSet = HashSet::new();
+    use log_address::LogAddress;
     let mut file_iterator: Peekable<_> = file.bytes().log().peekable();
     for byte in SIGNATURE.iter() {
       if *byte != read!(file_iterator)? {
@@ -113,10 +113,15 @@ impl Reader for JpgReader {
         } else if chunk_type == EOF_CHUNK_TYPE {
           info!("{}", "EOF".green());
           break;
-        // This guard checks if the data at least starts with an 'h' (as in "http://ns.adobe.com/xap/1.0/")
-        } else if chunk_type == TAGS_CHUNK_TYPE && read!(file_iterator_ref;peek) != Some(0x68) {
+        } else if chunk_type == TAGS_CHUNK_TYPE {
           let chunk_data = JpgReader::get_chunk_data(&mut file_iterator_ref)?;
-          let chunk_string = match String::from_utf8(chunk_data) {
+          let chunk_string;
+
+          if chunk_data[0] != 0x68 {
+            continue;
+          }
+
+          chunk_string = match String::from_utf8(chunk_data) {
             Ok(v) => v,
             Err(e) => {
               error!(
@@ -145,7 +150,96 @@ impl Reader for JpgReader {
     Ok(tags)
   }
   fn write_tags(file: &mut impl Read, tags: &TagSet) -> Result<Vec<u8>, Error> {
-    unimplemented!("Sorry dude, I can't do that yet");
+    use log_address::LogAddress;
+    let mut file_iterator: Peekable<_> = file.bytes().log().peekable();
+    let (_, file_size): (usize, Option<usize>) = file_iterator.size_hint();
+    info!("File size: {:?}", file_size);
+    let mut bytes: Vec<u8> = Vec::with_capacity(file_size.unwrap_or(5_000_000)); // File size or 5MB
+    for byte in SIGNATURE.iter() {
+      if *byte != read!(file_iterator)? {
+        return Err(Error::UnknownFormat);
+      }
+      bytes.push(*byte);
+    }
+    let mut chunk_type: u8;
+    let mut chunk_tags_address: Option<usize> = None;
+    loop {
+      let byte = read!(file_iterator)?;
+      bytes.push(byte);
+      if byte == 0xFF {
+        if read!(file_iterator;peek) == Some(EOF_CHUNK_TYPE) {
+          break;
+        }
+      }
+    }
+    /* loop {
+      let mut file_iterator_ref = &mut file_iterator;
+      let next_byte = read!(file_iterator_ref)?;
+      if next_byte == 0xFF {
+        bytes.push(next_byte);
+        chunk_type = read!(file_iterator_ref)?;
+        if read!(file_iterator_ref;peek) == Some(0xFF) {
+          info!("Peeked the start of another chunk");
+          continue;
+        }
+        info!("Chunk type: {:#02X?}", chunk_type);
+        if chunk_type == 0x00 {
+          //eprintln!("{}", "Skipping 0xFF inside chunk data".yellow());
+          continue;
+        } else if chunk_type == EOF_CHUNK_TYPE {
+          info!("{}", "EOF".green());
+          break;
+        } else if chunk_type == TAGS_CHUNK_TYPE {
+          let chunk_data = JpgReader::get_chunk_data(&mut file_iterator_ref)?;
+          let chunk_string;
+
+          let chunk_length: (u8, u8) = {
+            let len = chunk_data.len() + 2;
+            (((len & 0xFF00) >> 8) as u8, (len & 0xFF) as u8)
+          };
+          // This may be wrong
+          bytes.push(chunk_length.0);
+          bytes.push(chunk_length.1);
+          for b in &chunk_data {
+            bytes.push(*b);
+          }
+
+          if chunk_data[0] != 0x68 {
+            continue;
+          }
+
+          chunk_string = match String::from_utf8(chunk_data) {
+            Ok(v) => v,
+            Err(e) => {
+              error!(
+                "Chunk data wasn't an XML (Failed with error {:#?})",
+                format!("{:?}", e).red()
+              );
+              continue;
+            }
+          };
+          info!("This is the XML found: '{}'", chunk_string.yellow());
+          chunk_tags_address = Some(bytes.len());
+        } else {
+          //JpgReader::skip_chunk_data(&mut file_iterator_ref)?;
+          let chunk_data = JpgReader::get_chunk_data(&mut file_iterator_ref)?;
+          let chunk_length: (u8, u8) = {
+            let len = chunk_data.len() + 2;
+            (((len & 0xFF00) >> 8) as u8, (len & 0xFF) as u8)
+          };
+          bytes.push(chunk_length.0);
+          bytes.push(chunk_length.1);
+          for b in &chunk_data {
+            bytes.push(*b);
+          }
+        }
+      } else {
+        bytes.push(next_byte);
+        error!("Skipping bytes");
+      }
+    } */
+    println!("Data recorded size: {}", bytes.len());
+    return Ok(bytes);
   }
 }
 impl JpgReader {
@@ -256,4 +350,14 @@ mod tests {
     assert!(tags.contains("pepe"));
     assert!(tags.contains("fefe"));
   }
+
+  #[test]
+  fn test_write_empty() {
+    let mut file = File::open("tests/empty.jpeg").unwrap();
+    let mut tags = TagSet::new();
+    tags.insert("pepe".to_string());
+    let bytes = JpgReader::write_tags(&mut file, &tags);
+  }
+  #[test]
+  fn test_write_tagged() {}
 }
