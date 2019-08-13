@@ -158,28 +158,59 @@ impl Reader for JpgReader {
     if bytes.len() == 0 || bytes[bytes.len() - 1] != 0xD9 {
       return Err(Error::ParserError);
     }
-    let mut tags_address: usize = bytes.len() - 2;
+    let mut tags_address_start: Option<usize> = None;
+    let mut tags_address_end: Option<usize> = None;
     let mut windows = bytes.windows(2);
     for (addr, slice) in windows.enumerate() {
       if slice[0] != 0xFF {
         continue;
       }
-      if slice[1] == TAGS_CHUNK_TYPE {
-        info!("0xFFE1 found");
-        tags_address = addr;
+      if slice[1] != 0x00 && tags_address_start!=None {
+        println!("Found finish");
+        tags_address_end = Some(addr);
         break;
       }
+      if slice[1] == TAGS_CHUNK_TYPE {
+        println!("0xFFE1 found on {}",addr);
+        tags_address_start = Some(addr);
+      }
     }
-
-    // Look, NOBODY cares about the damn chunk length, so I will just leave it as 0x0000, k?
+    if tags_address_start==None {
+      tags_address_start = Some(bytes.len() - 2);
+      tags_address_end = Some(bytes.len() - 2);
+    }
     let mut tags_bytes: Vec<u8> = vec![0xFF, TAGS_CHUNK_TYPE, 0x00, 0x00];
     for tag in tags {
       let tag: String = tag.to_string();
       tags_bytes.append(&mut tag.into_bytes());
+      tags_bytes.push(',' as u8);
+    }
+    let mut bytes_diff: isize = (tags_address_end.unwrap()-tags_address_start.unwrap()) as isize - tags_bytes.len() as isize;
+    if bytes_diff < 0 {
+      loop {
+        bytes.insert(tags_address_start.unwrap(), 0x00);
+        bytes_diff += 1;
+        if bytes_diff==0{break;}
+      }
+    } else if tags_address_end.unwrap()-tags_address_start.unwrap() > tags_bytes.len() {
+      loop {
+        bytes.remove(tags_address_start.unwrap());
+        bytes_diff -= 1;
+        if bytes_diff==0{break;}
+      }
     }
     for (i, b) in tags_bytes.iter().enumerate() {
-      bytes.insert(tags_address + i, *b);
+      bytes[tags_address_start.unwrap() + i] = *b;
     }
+    // Look, NOBODY cares about the damn chunk length, so I will just leave it as 0x0000, k?
+    // for (i, b) in tags_bytes.iter().enumerate() {
+    //   //bytes.insert(tags_address_start + i, *b);
+    //   if tags_address_start.unwrap() + i == 0 {
+
+    //   }
+    // }
+    println!("Bytes aval.: {}\nBytes needed: {}",tags_address_end.unwrap()-tags_address_start.unwrap(),tags_bytes.len());
+
 
     println!("{:#?}", t.elapsed());
     println!("Data recorded size: {}", bytes.len());
