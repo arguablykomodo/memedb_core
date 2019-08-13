@@ -108,7 +108,6 @@ impl Reader for JpgReader {
         }
         info!("Chunk type: {:#02X?}", chunk_type);
         if chunk_type == 0x00 {
-          //eprintln!("{}", "Skipping 0xFF inside chunk data".yellow());
           continue;
         } else if chunk_type == EOF_CHUNK_TYPE {
           info!("{}", "EOF".green());
@@ -143,7 +142,7 @@ impl Reader for JpgReader {
           JpgReader::skip_chunk_data(&mut file_iterator_ref)?;
         }
       } else {
-        file_iterator_ref.next();
+        read!(file_iterator_ref)?;
         error!("Skipping bytes");
       }
     }
@@ -152,26 +151,25 @@ impl Reader for JpgReader {
   fn write_tags(file: &mut impl Read, tags: &TagSet) -> Result<Vec<u8>, Error> {
     use std::time::SystemTime;
     let t = SystemTime::now();
-    use log_address::LogAddress;
     let mut bytes = vec![];
-    file.read_to_end(&mut bytes);
+    file.read_to_end(&mut bytes)?;
     if bytes.len() == 0 || bytes[bytes.len() - 1] != 0xD9 {
       return Err(Error::ParserError);
     }
     let mut tags_address_start: Option<usize> = None;
     let mut tags_address_end: Option<usize> = None;
-    let mut windows = bytes.windows(2);
+    let windows = bytes.windows(2);
     for (addr, slice) in windows.enumerate() {
       if slice[0] != 0xFF {
         continue;
       }
       if slice[1] != 0x00 && tags_address_start!=None {
-        println!("Found finish");
+        info!("Found 0xFFE1 end on {}",addr);
         tags_address_end = Some(addr);
         break;
       }
       if slice[1] == TAGS_CHUNK_TYPE {
-        println!("0xFFE1 found on {}",addr);
+        info!("0xFFE1 found on {}",addr);
         tags_address_start = Some(addr);
       }
     }
@@ -202,18 +200,6 @@ impl Reader for JpgReader {
     for (i, b) in tags_bytes.iter().enumerate() {
       bytes[tags_address_start.unwrap() + i] = *b;
     }
-    // Look, NOBODY cares about the damn chunk length, so I will just leave it as 0x0000, k?
-    // for (i, b) in tags_bytes.iter().enumerate() {
-    //   //bytes.insert(tags_address_start + i, *b);
-    //   if tags_address_start.unwrap() + i == 0 {
-
-    //   }
-    // }
-    println!("Bytes aval.: {}\nBytes needed: {}",tags_address_end.unwrap()-tags_address_start.unwrap(),tags_bytes.len());
-
-
-    println!("{:#?}", t.elapsed());
-    println!("Data recorded size: {}", bytes.len());
     return Ok(bytes);
   }
 }
