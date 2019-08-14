@@ -150,8 +150,8 @@ impl Reader for JpgReader {
     let t = SystemTime::now();
     let mut bytes = vec![];
     file.read_to_end(&mut bytes)?;
-    if bytes.len() == 0 || bytes[bytes.len() - 1] != 0xD9 {
-      return Err(Error::ParserError);
+    if bytes[0..SIGNATURE.len()] != *SIGNATURE {
+      return Err(Error::UnknownFormat);
     }
     let mut tags_address_start: Option<usize> = None;
     let mut tags_address_end: Option<usize> = None;
@@ -325,7 +325,7 @@ mod tests {
 
   #[test]
   fn test_read_empty() {
-    let mut file = File::open("tests/empty.jpeg").unwrap();
+    let mut file = File::open("tests/empty.jpg").unwrap();
     let tags: Result<TagSet, Error> = JpgReader::read_tags(&mut file);
     assert!(tags.is_ok());
     let tags: TagSet = tags.unwrap();
@@ -339,16 +339,41 @@ mod tests {
     assert!(tags.is_ok());
     let tags: TagSet = tags.unwrap();
     assert!(tags.contains("pepe"));
-    assert!(tags.contains("fefe"));
+  }
+
+  #[test]
+  fn test_write_invalid() {
+    let mut file = File::open("tests/invalid").unwrap();
+    let tags = TagSet::new();
+    assert_eq!(
+      std::mem::discriminant(&JpgReader::write_tags(&mut file, &tags).unwrap_err()),
+      std::mem::discriminant(&Error::UnknownFormat)
+    );
   }
 
   #[test]
   fn test_write_empty() {
-    let mut file = File::open("tests/empty.jpeg").unwrap();
+    let mut empty = File::open("tests/empty.jpg").unwrap();
     let mut tags = TagSet::new();
     tags.insert("pepe".to_string());
-    let bytes = JpgReader::write_tags(&mut file, &tags);
+    let empty_bytes = JpgReader::write_tags(&mut empty, &tags).unwrap();
+
+    let mut tagged = File::open("tests/tagged.jpg").unwrap();
+    let mut tagged_bytes = Vec::new();
+    tagged.read_to_end(&mut tagged_bytes).unwrap();
+
+    assert_eq!(empty_bytes, tagged_bytes);
   }
+
   #[test]
-  fn test_write_tagged() {}
+  fn test_write_tagged() {
+    let mut file = File::open("tests/tagged.jpg").unwrap();
+    let tags = TagSet::new();
+    let result_bytes = JpgReader::write_tags(&mut file, &tags).unwrap();
+    let mut untagged = File::open("tests/untagged.jpg").unwrap();
+    let mut untagged_bytes = Vec::new();
+    untagged.read_to_end(&mut untagged_bytes).unwrap();
+
+    assert_eq!(result_bytes, untagged_bytes);
+  }
 }
