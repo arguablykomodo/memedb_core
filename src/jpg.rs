@@ -204,19 +204,19 @@ impl Reader for JpgReader {
         }
       }
     }
-    info!("Writting {} bytes", tags_bytes.len());
+    info!("Writting {} ({0:#02X}) bytes", tags_bytes.len());
     for (i, b) in tags_bytes.iter().enumerate() {
       bytes[tags_address_start.unwrap() + i] = *b;
     }
 
     use std::convert::TryInto;
     // The -2 is there because otherwise the length would take into count the 0xFFE1
-    let tags_bytes_length: u16 = match (tags_bytes.len() - 4).try_into() {
+    let tags_bytes_length: u16 = match (tags_bytes.len() - 2).try_into() {
       Ok(v) => v,
       Err(e) => return Err(Error::WriterError),
     };
-    bytes[tags_address_start.unwrap() + 3] = (tags_bytes.len() & 0xFF) as u8;
-    bytes[tags_address_start.unwrap() + 2] = ((tags_bytes.len() >> 8) & 0xFF) as u8;
+    bytes[tags_address_start.unwrap() + 3] = (tags_bytes_length & 0xFF) as u8;
+    bytes[tags_address_start.unwrap() + 2] = ((tags_bytes_length >> 8) & 0xFF) as u8;
     debug!("Finished in {:?}", t.elapsed().unwrap());
 
     return Ok(bytes);
