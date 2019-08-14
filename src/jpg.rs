@@ -110,7 +110,7 @@ impl Reader for JpgReader {
         if chunk_type == 0x00 {
           continue;
         } else if chunk_type == EOF_CHUNK_TYPE {
-          info!("{}", "EOF".green());
+          debug!("{}", "EOF".green());
           break;
         } else if chunk_type == TAGS_CHUNK_TYPE {
           let chunk_data = JpgReader::get_chunk_data(&mut file_iterator_ref)?;
@@ -123,10 +123,7 @@ impl Reader for JpgReader {
           chunk_string = match String::from_utf8(chunk_data) {
             Ok(v) => v,
             Err(e) => {
-              error!(
-                "Chunk data wasn't an XML (Failed with error {:#?})",
-                format!("{:?}", e).red()
-              );
+              error!("Chunk data wasn't an XML (Failed with error {:#X?})", e);
               continue;
             }
           };
@@ -142,7 +139,7 @@ impl Reader for JpgReader {
           JpgReader::skip_chunk_data(&mut file_iterator_ref)?;
         }
       } else {
-        read!(file_iterator_ref)?;
+        //read!(file_iterator_ref)?;
         error!("Skipping bytes");
       }
     }
@@ -163,43 +160,65 @@ impl Reader for JpgReader {
       if slice[0] != 0xFF {
         continue;
       }
-      if slice[1] != 0x00 && tags_address_start!=None {
-        info!("Found 0xFFE1 end on {}",addr);
+      if slice[1] != 0x00 && tags_address_start != None {
+        info!("Found 0xFFE1 end on {}", addr);
         tags_address_end = Some(addr);
         break;
       }
       if slice[1] == TAGS_CHUNK_TYPE {
-        info!("0xFFE1 found on {}",addr);
-        tags_address_start = Some(addr);
+        if &bytes[addr + 4..addr + 8] == &['h' as u8, 't' as u8, 't' as u8, 'p' as u8] {
+          info!("0xFFE1 found on {}", addr);
+          tags_address_start = Some(addr);
+        } else {
+          info!(
+            "On {:#06X?} found {:#04X?}",
+            addr,
+            &bytes[addr + 4..addr + 8]
+          );
+        }
       }
     }
-    if tags_address_start==None {
+    if tags_address_start == None {
+      info!("This image contains no tags");
       tags_address_start = Some(bytes.len() - 2);
       tags_address_end = Some(bytes.len() - 2);
     }
     let mut tags_bytes: Vec<u8> = vec![0xFF, TAGS_CHUNK_TYPE, 0x00, 0x00];
-    for tag in tags {
-      let tag: String = tag.to_string();
-      tags_bytes.append(&mut tag.into_bytes());
-      tags_bytes.push(',' as u8);
-    }
-    let mut bytes_diff: isize = (tags_address_end.unwrap()-tags_address_start.unwrap()) as isize - tags_bytes.len() as isize;
+    tags_bytes.append(&mut JpgReader::create_xml(tags));
+    let mut bytes_diff: isize = (tags_address_end.unwrap() - tags_address_start.unwrap()) as isize
+      - tags_bytes.len() as isize;
     if bytes_diff < 0 {
       loop {
         bytes.insert(tags_address_start.unwrap(), 0x00);
         bytes_diff += 1;
-        if bytes_diff==0{break;}
+        if bytes_diff == 0 {
+          break;
+        }
       }
-    } else if tags_address_end.unwrap()-tags_address_start.unwrap() > tags_bytes.len() {
+    } else if bytes_diff > tags_bytes.len() as isize {
       loop {
         bytes.remove(tags_address_start.unwrap());
         bytes_diff -= 1;
-        if bytes_diff==0{break;}
+        if bytes_diff == 0 {
+          break;
+        }
       }
     }
+    info!("Writting {} bytes", tags_bytes.len());
     for (i, b) in tags_bytes.iter().enumerate() {
       bytes[tags_address_start.unwrap() + i] = *b;
     }
+
+    use std::convert::TryInto;
+    // The -2 is there because otherwise the length would take into count the 0xFFE1
+    let tags_bytes_length: u16 = match (tags_bytes.len() - 4).try_into() {
+      Ok(v) => v,
+      Err(e) => return Err(Error::WriterError),
+    };
+    bytes[tags_address_start.unwrap() + 3] = (tags_bytes.len() & 0xFF) as u8;
+    bytes[tags_address_start.unwrap() + 2] = ((tags_bytes.len() >> 8) & 0xFF) as u8;
+    debug!("Finished in {:?}", t.elapsed().unwrap());
+
     return Ok(bytes);
   }
 }
@@ -227,6 +246,7 @@ impl JpgReader {
         Err(e) => Err(e),
       };
     } else {
+      debug!("Read {:#02X?}", &chunk_data[chunk_data.len() - 8..]);
       return Ok(chunk_data);
     }
   }
@@ -249,6 +269,7 @@ impl JpgReader {
     chunk_length |= (read!(file_iterator)? as usize) << 8;
     chunk_length |= read!(file_iterator)? as usize;
     chunk_length -= 2;
+    debug!("Req. chunk of {:#04X} bytes", chunk_length);
     return Ok(chunk_length);
   }
   fn parse_xml(xml: &str) -> Result<TagSet, Error> {
@@ -276,6 +297,15 @@ impl JpgReader {
       );
     }
     Ok(tags)
+  }
+  fn create_xml(tags: &TagSet) -> Vec<u8> {
+    let mut tags_string = String::with_capacity(tags.len() * (8 + 9));
+    for tag in tags {
+      tags_string.push_str(&format!("<rdf:li>{}</rdf:li>", tag))
+    }
+    format!(include_str!("template.xml"), tags = tags_string)
+      .bytes()
+      .collect::<Vec<u8>>()
   }
 }
 

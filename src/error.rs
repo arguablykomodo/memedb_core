@@ -4,6 +4,7 @@ pub enum Error {
     UnexpectedEOF,
     WrongFormat,
     ParserError,
+    WriterError,
     IOError(std::io::Error),
 }
 
