@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::log::{debug, error, info, warn};
+use crate::log::{debug, error, info};
 use crate::reader::Reader;
 use crate::xml::{XmlTag, XmlTree};
 use crate::TagSet;
@@ -90,7 +90,6 @@ impl Reader for JpgReader {
       }
     }
     let mut chunk_type: u8;
-    let mut chunk_length: usize;
     loop {
       // Loops in rust have a bug where they consume variables in spite of borrowing them
       // making them unusable in the next iteration (thus failing even to compile)
@@ -213,7 +212,7 @@ impl Reader for JpgReader {
     // The -2 is there because otherwise the length would take into count the 0xFFE1
     let tags_bytes_length: u16 = match (tags_bytes.len() - 2).try_into() {
       Ok(v) => v,
-      Err(e) => return Err(Error::WriterError),
+      Err(_) => return Err(Error::WriterError),
     };
     bytes[tags_address_start.unwrap() + 3] = (tags_bytes_length & 0xFF) as u8;
     bytes[tags_address_start.unwrap() + 2] = ((tags_bytes_length >> 8) & 0xFF) as u8;
