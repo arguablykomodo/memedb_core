@@ -1,4 +1,5 @@
 pub mod error;
+mod gif;
 mod jpg;
 mod png;
 mod reader;
@@ -35,7 +36,7 @@ pub fn write_tags(path: &String, tags: &TagSet) -> Result<(), Error> {
     let bytes = match path.split(".").last().unwrap() {
         "png" => png::PngReader::write_tags(&mut file, &tags)?,
         "gif" => gif::GifReader::write_tags(&mut file, &tags)?,
-        "jpg" | "jpeg" => jpg::JpgReader::write_tags(&mut file, &tags),
+        "jpg" | "jpeg" => jpg::JpgReader::write_tags(&mut file, &tags)?,
         _ => return Err(Error::UnknownFormat),
     };
     let mut file = OpenOptions::new().write(true).truncate(true).open(&path)?;
