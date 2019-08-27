@@ -8,8 +8,10 @@ mod xml;
 use error::Error;
 use reader::Reader;
 use std::collections::HashSet;
+use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
+use std::path::Path;
 
 #[macro_use]
 extern crate log;
@@ -17,26 +19,26 @@ extern crate env_logger;
 
 pub type TagSet = HashSet<String>;
 
-pub fn read_tags(path: String) -> Result<TagSet, Error> {
+pub fn read_tags(path: &Path) -> Result<TagSet, Error> {
     env_logger::init();
     debug!("Debugging enabled");
     let mut file = File::open(&path)?;
-    match path.split(".").last().unwrap() {
-        "png" => png::PngReader::read_tags(&mut file),
-        "gif" => gif::GifReader::read_tags(&mut file),
-        "jpg" | "jpeg" => jpg::JpgReader::read_tags(&mut file),
+    match path.extension().and_then(OsStr::to_str) {
+        Some("png") => png::PngReader::read_tags(&mut file),
+        Some("gif") => gif::GifReader::read_tags(&mut file),
+        Some("jpg") | Some("jpeg") => jpg::JpgReader::read_tags(&mut file),
         _ => Err(Error::UnknownFormat),
     }
 }
 
-pub fn write_tags(path: &String, tags: &TagSet) -> Result<(), Error> {
+pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
     env_logger::init();
     debug!("Debugging enabled");
     let mut file = File::open(&path)?;
-    let bytes = match path.split(".").last().unwrap() {
-        "png" => png::PngReader::write_tags(&mut file, &tags)?,
-        "gif" => gif::GifReader::write_tags(&mut file, &tags)?,
-        "jpg" | "jpeg" => jpg::JpgReader::write_tags(&mut file, &tags)?,
+    let bytes = match path.extension().and_then(OsStr::to_str) {
+        Some("png") => png::PngReader::write_tags(&mut file, &tags)?,
+        Some("gif") => gif::GifReader::write_tags(&mut file, &tags)?,
+        Some("jpg") | Some("jpeg") => jpg::JpgReader::write_tags(&mut file, &tags)?,
         _ => return Err(Error::UnknownFormat),
     };
     let mut file = OpenOptions::new().write(true).truncate(true).open(&path)?;
