@@ -1,6 +1,7 @@
 use crate::error::Error;
 use crate::reader::Reader;
 use crate::TagSet;
+use crc::crc32;
 use std::io::Read;
 
 const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
@@ -74,11 +75,17 @@ impl Reader for PngReader {
             chunk_length.push((tags.len() >> (3 - i) * 8) as u8);
         }
 
+        let checksum = crc32::checksum_ieee(&tags);
         let mut new_chunk = Vec::new();
         new_chunk.append(&mut chunk_length);
         new_chunk.append(&mut vec![b'm', b'e', b'M', b'e']);
         new_chunk.append(&mut tags);
-        new_chunk.append(&mut vec![0, 0, 0, 0]); // Empty checksum for now (see issue #1)
+        new_chunk.append(&mut vec![
+            (checksum >> 24 & 0xFF) as u8,
+            (checksum >> 16 & 0xFF) as u8,
+            (checksum >> 8 & 0xFF) as u8,
+            (checksum & 0xFF) as u8,
+        ]);
 
         let mut i = SIGNATURE.len();
         loop {
