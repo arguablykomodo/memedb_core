@@ -172,19 +172,13 @@ mod tests {
         tags.insert("foo".to_owned());
         tags.insert("bar".to_owned());
 
-        use std::io::Write;
         let result_bytes = PngReader::write_tags(&mut file, &tags).unwrap();
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .open("tests/tagged.png")
-            .unwrap();
-        file.write_all(&result_bytes).unwrap();
-        // let mut test = File::open("tests/tagged.png").unwrap();
-        // let mut test_bytes = Vec::new();
-        // test.read_to_end(&mut test_bytes).unwrap();
 
-        // assert_eq!(result_bytes, test_bytes);
+        let mut test = File::open("tests/tagged.png").unwrap();
+        let mut test_bytes = Vec::new();
+        test.read_to_end(&mut test_bytes).unwrap();
+
+        assert_eq!(result_bytes, test_bytes);
     }
 
     #[test]
@@ -193,13 +187,12 @@ mod tests {
 
         let tags = TagSet::new();
 
-        use std::io::Write;
         let result_bytes = PngReader::write_tags(&mut file, &tags).unwrap();
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .open("tests/untagged.png")
-            .unwrap();
-        file.write_all(&result_bytes).unwrap();
+
+        let mut test = File::open("tests/untagged.png").unwrap();
+        let mut test_bytes = Vec::new();
+        test.read_to_end(&mut test_bytes).unwrap();
+
+        assert_eq!(result_bytes, test_bytes);
     }
 }
