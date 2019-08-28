@@ -124,6 +124,9 @@ impl Reader for PngReader {
 
 #[cfg(test)]
 mod tests {
+    // Cool program for checking CRCs:
+    // http://www.libpng.org/pub/png/apps/pngcheck.html
+
     use super::*;
     use std::fs::File;
 
