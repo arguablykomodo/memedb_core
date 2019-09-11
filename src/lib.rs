@@ -13,13 +13,11 @@ use std::io::Write;
 
 #[macro_use]
 extern crate log;
-extern crate env_logger;
 
 pub type TagSet = HashSet<String>;
 
 pub fn read_tags(path: String) -> Result<TagSet, Error> {
-    env_logger::init();
-    debug!("Debugging enabled");
+    info!("Debugging enabled");
     let mut file = File::open(&path)?;
     match path.split(".").last().unwrap() {
         "png" => png::PngReader::read_tags(&mut file),
@@ -30,8 +28,7 @@ pub fn read_tags(path: String) -> Result<TagSet, Error> {
 }
 
 pub fn write_tags(path: &String, tags: &TagSet) -> Result<(), Error> {
-    env_logger::init();
-    debug!("Debugging enabled");
+    info!("Debugging enabled");
     let mut file = File::open(&path)?;
     let bytes = match path.split(".").last().unwrap() {
         "png" => png::PngReader::write_tags(&mut file, &tags)?,

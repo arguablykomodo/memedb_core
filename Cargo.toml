@@ -8,4 +8,3 @@ edition = "2018"
 [dependencies]
 colored = "^1.8.0"
 log = {version="^0.4.0",features = ["max_level_debug", "release_max_level_off"] }
-env_logger = "^0.6.0"
