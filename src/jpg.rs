@@ -60,13 +60,6 @@ macro_rules! read {
             None => Err(Error::UnexpectedEOF),
         }
     };
-    ($i:ident; $c: literal) => {{
-        let mut out: [u8; $c] = [0xFF; $c];
-        for (i, v) in $i.take($c).enumerate() {
-            out[i] = v?;
-        }
-        out
-    }};
     ($i:ident; peek) => {
         match $i.peek() {
             Some(r) => match r {
@@ -84,16 +77,12 @@ impl Reader for JpgReader {
         let mut tags: TagSet = HashSet::new();
         use log_address::LogAddress;
         let mut file_iterator: Peekable<_> = file.bytes().log().peekable();
-        for byte in SIGNATURE.iter() {
-            if *byte != read!(file_iterator)? {
-                return Err(Error::UnknownFormat);
-            }
-        }
+        JpgReader::verify_signature(&mut file_iterator)?;
         let mut chunk_type: u8;
         loop {
-            // Loops in rust have a bug where they consume variables in spite of borrowing them
-            // making them unusable in the next iteration (thus failing even to compile)
-            // Just declaring a dumb var and pointing it to the desired variable makes it usable in all the iterations
+            /* Loops in rust have a bug where they consume variables in spite of borrowing them
+            making them unusable in the next iteration (thus failing even to compile)
+            Just declaring a dumb var and pointing it to the desired variable makes it usable in all the iterations */
             let mut file_iterator_ref = &mut file_iterator;
             let peeked = match read!(file_iterator_ref) {
                 Ok(v) => v,
@@ -138,32 +127,33 @@ impl Reader for JpgReader {
                     JpgReader::skip_chunk_data(&mut file_iterator_ref)?;
                 }
             } else {
-                //read!(file_iterator_ref)?;
                 error!("Skipping bytes");
             }
         }
         Ok(tags)
     }
     fn write_tags(file: &mut impl Read, tags: &TagSet) -> Result<Vec<u8>, Error> {
+        let mut file_iterator: _ = file.bytes();
+        JpgReader::verify_signature(&mut file_iterator)?;
         use std::time::SystemTime;
-        let t = SystemTime::now();
-        let mut bytes = vec![];
-        file.read_to_end(&mut bytes)?;
-        if bytes[0..SIGNATURE.len()] != *SIGNATURE {
-            return Err(Error::UnknownFormat);
-        }
-        let mut tags_address_start: Option<usize> = None;
-        let mut tags_address_end: Option<usize> = None;
-        let windows = bytes.windows(2);
+        let t = SystemTime::now(); // Poor's Man benchmark
+        let mut bytes: Vec<u8> = file_iterator.map(|v| v.unwrap()).collect();
+        let mut tags_address_start: Option<usize> = None; // These 2 hold the addresses of the tag's chunk
+        let mut tags_address_end: Option<usize> = None; //
+        let windows = bytes.windows(2); // Iterate in pairs
         for (addr, slice) in windows.enumerate() {
+            // Skip until chunk
             if slice[0] != 0xFF {
                 continue;
             }
+            // slice[0] == 0xFF
+            // When found another chunk, break if the tags were found
             if slice[1] != 0x00 && tags_address_start != None {
                 info!("Found 0xFFE1 end on {}", addr);
                 tags_address_end = Some(addr);
                 break;
             }
+            // This checks if tags were found
             if slice[1] == TAGS_CHUNK_TYPE {
                 if &bytes[addr + 4..addr + 8] == &['h' as u8, 't' as u8, 't' as u8, 'p' as u8] {
                     info!("0xFFE1 found on {}", addr);
@@ -177,6 +167,7 @@ impl Reader for JpgReader {
                 }
             }
         }
+        // If no chunk was found, make the vars point to the end of the file
         if tags_address_start == None {
             info!("This image contains no tags");
             tags_address_start = Some(bytes.len() - 2);
@@ -187,6 +178,7 @@ impl Reader for JpgReader {
         let mut bytes_diff: isize = (tags_address_end.unwrap() - tags_address_start.unwrap())
             as isize
             - tags_bytes.len() as isize;
+        // Take the existing chunk in the file and resize it to fit the new chunk
         if bytes_diff < 0 {
             loop {
                 bytes.insert(tags_address_start.unwrap(), 0x00);
@@ -204,16 +196,18 @@ impl Reader for JpgReader {
                 }
             }
         }
+        // Copy the bytes of the tag's chunk into the file's buffer
         info!("Writting {} ({0:#02X}) bytes", tags_bytes.len());
         for (i, b) in tags_bytes.iter().enumerate() {
             bytes[tags_address_start.unwrap() + i] = *b;
         }
 
         use std::convert::TryInto;
+        // This tries to convert the chunk's length into a u16 (0-65535), returning an error if it couldn't
         // The -2 is there because otherwise the length would take into count the 0xFFE1
         let tags_bytes_length: u16 = match (tags_bytes.len() - 2).try_into() {
             Ok(v) => v,
-            Err(_) => return Err(Error::WriterError),
+            Err(e) => return Err(Error::WriterError),
         };
         bytes[tags_address_start.unwrap() + 3] = (tags_bytes_length & 0xFF) as u8;
         bytes[tags_address_start.unwrap() + 2] = ((tags_bytes_length >> 8) & 0xFF) as u8;
@@ -271,6 +265,19 @@ impl JpgReader {
         chunk_length -= 2;
         debug!("Req. chunk of {:#04X} bytes", chunk_length);
         return Ok(chunk_length);
+    }
+    fn verify_signature(
+        file_iterator: &mut impl Iterator<Item = Result<u8, std::io::Error>>,
+    ) -> Result<(), Error> {
+        for bytes in SIGNATURE.iter().zip(file_iterator) {
+            // Iterate first bytes of the file and SIGNATURE at the same time
+            if *bytes.0 != bytes.1? {
+                // The for returns a tuple: (&u8,Result<u8,E>), the 1st value is the signature, the other is the file
+                info!("Signature checking failed.");
+                return Err(Error::UnknownFormat);
+            }
+        }
+        Ok(())
     }
     fn parse_xml(xml: &str) -> Result<TagSet, Error> {
         let tree = XmlTree::parse(xml.to_string())?;
