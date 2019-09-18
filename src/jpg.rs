@@ -53,11 +53,8 @@ mod log_address {
 macro_rules! read {
     ($i:ident) => {
         match $i.next() {
-            Some(r) => match r {
-                Ok(v) => Ok(v),
-                Err(e) => Err(Error::IOError(e)),
-            },
-            None => Err(Error::UnexpectedEOF),
+            Some(r) => r.map_err(|err| err.into()),
+            None => Err(Error::EOF),
         }
     };
     ($i:ident; $c: literal) => {{
@@ -86,7 +83,7 @@ impl Reader for JpgReader {
         let mut file_iterator: Peekable<_> = file.bytes().log().peekable();
         for byte in SIGNATURE.iter() {
             if *byte != read!(file_iterator)? {
-                return Err(Error::UnknownFormat);
+                return Err(Error::Format);
             }
         }
         let mut chunk_type: u8;
@@ -150,7 +147,7 @@ impl Reader for JpgReader {
         let mut bytes = vec![];
         file.read_to_end(&mut bytes)?;
         if bytes[0..SIGNATURE.len()] != *SIGNATURE {
-            return Err(Error::UnknownFormat);
+            return Err(Error::Format);
         }
         let mut tags_address_start: Option<usize> = None;
         let mut tags_address_end: Option<usize> = None;
@@ -213,7 +210,7 @@ impl Reader for JpgReader {
         // The -2 is there because otherwise the length would take into count the 0xFFE1
         let tags_bytes_length: u16 = match (tags_bytes.len() - 2).try_into() {
             Ok(v) => v,
-            Err(_) => return Err(Error::WriterError),
+            Err(_) => return Err(Error::Format),
         };
         bytes[tags_address_start.unwrap() + 3] = (tags_bytes_length & 0xFF) as u8;
         bytes[tags_address_start.unwrap() + 2] = ((tags_bytes_length >> 8) & 0xFF) as u8;
@@ -242,7 +239,7 @@ impl JpgReader {
                 .red()
             );
             return match read!(file_iterator) {
-                Ok(_) => Err(Error::ParserError),
+                Ok(_) => Err(Error::Format),
                 Err(e) => Err(e),
             };
         } else {
@@ -257,7 +254,7 @@ impl JpgReader {
         for _ in 0..chunk_length {
             match file_iterator.next() {
                 Some(v) => v?,
-                None => return Err(Error::UnexpectedEOF),
+                None => return Err(Error::EOF),
             };
         }
         Ok(())
@@ -319,7 +316,7 @@ mod tests {
         let mut file = File::open("tests/invalid").unwrap();
         assert_eq!(
             std::mem::discriminant(&JpgReader::read_tags(&mut file).unwrap_err()),
-            std::mem::discriminant(&Error::UnknownFormat)
+            std::mem::discriminant(&Error::Format)
         );
     }
 
@@ -347,7 +344,7 @@ mod tests {
         let tags = TagSet::new();
         assert_eq!(
             std::mem::discriminant(&JpgReader::write_tags(&mut file, &tags).unwrap_err()),
-            std::mem::discriminant(&Error::UnknownFormat)
+            std::mem::discriminant(&Error::Format)
         );
     }
 

@@ -25,7 +25,7 @@ pub fn read_tags(path: &Path) -> Result<TagSet, Error> {
         Some("png") => png::PngReader::read_tags(&mut file),
         Some("gif") => gif::GifReader::read_tags(&mut file),
         Some("jpg") | Some("jpeg") => jpg::JpgReader::read_tags(&mut file),
-        _ => Err(Error::UnknownFormat),
+        _ => Err(Error::Format),
     }
 }
 
@@ -36,7 +36,7 @@ pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
         Some("png") => png::PngReader::write_tags(&mut file, &tags)?,
         Some("gif") => gif::GifReader::write_tags(&mut file, &tags)?,
         Some("jpg") | Some("jpeg") => jpg::JpgReader::write_tags(&mut file, &tags)?,
-        _ => return Err(Error::UnknownFormat),
+        _ => return Err(Error::Format),
     };
     let mut file = OpenOptions::new().write(true).truncate(true).open(&path)?;
     file.write_all(&bytes)?;

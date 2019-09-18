@@ -15,7 +15,7 @@ impl Reader for PngReader {
         let mut i = 0;
 
         if bytes[0..SIGNATURE.len()] != *SIGNATURE {
-            return Err(Error::UnknownFormat);
+            return Err(Error::Format);
         }
         i += SIGNATURE.len();
 
@@ -58,7 +58,7 @@ impl Reader for PngReader {
         file.read_to_end(&mut bytes)?;
 
         if bytes[0..SIGNATURE.len()] != *SIGNATURE {
-            return Err(Error::UnknownFormat);
+            return Err(Error::Format);
         };
 
         let mut tags: Vec<String> = tags.iter().cloned().collect();
@@ -136,7 +136,7 @@ mod tests {
         // mem::discriminant magic is used to compare enums without having to implement PartialEq
         assert_eq!(
             std::mem::discriminant(&PngReader::read_tags(&mut file).unwrap_err()),
-            std::mem::discriminant(&Error::UnknownFormat)
+            std::mem::discriminant(&Error::Format)
         );
     }
 
@@ -163,7 +163,7 @@ mod tests {
         // mem::discriminant magic is used to compare enums without having to implement PartialEq
         assert_eq!(
             std::mem::discriminant(&PngReader::write_tags(&mut file, &tags).unwrap_err()),
-            std::mem::discriminant(&Error::UnknownFormat)
+            std::mem::discriminant(&Error::Format)
         );
     }
 
