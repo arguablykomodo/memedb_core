@@ -1,15 +1,7 @@
-#[derive(Debug)]
-pub enum Error {
-    UnknownFormat,
-    UnexpectedEOF,
-    WrongFormat,
-    ParserError,
-    WriterError,
-    IOError(std::io::Error),
-}
+use custom_error::custom_error;
 
-impl From<std::io::Error> for Error {
-    fn from(error: std::io::Error) -> Self {
-        Error::IOError(error)
-    }
+custom_error! { pub Error
+    Format = "Invalid or unknown format",
+    EOF = "Reached unexpected end of file",
+    Io {source: std::io::Error} = "Error reading file"
 }

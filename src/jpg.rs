@@ -53,11 +53,8 @@ mod log_address {
 macro_rules! read {
     ($i:ident) => {
         match $i.next() {
-            Some(r) => match r {
-                Ok(v) => Ok(v),
-                Err(e) => Err(Error::IOError(e)),
-            },
-            None => Err(Error::UnexpectedEOF),
+            Some(r) => r.map_err(|err| err.into()),
+            None => Err(Error::EOF),
         }
     };
     ($i:ident; peek) => {
@@ -210,7 +207,7 @@ impl Reader for JpgReader {
         // The -2 is there because otherwise the length would take into count the 0xFFE1
         let tags_bytes_length: u16 = match (tags_bytes.len() - 2).try_into() {
             Ok(v) => v,
-            Err(e) => return Err(Error::WriterError),
+            Err(_) => return Err(Error::Format),
         };
         bytes[tags_address_start.unwrap() + 3] = (tags_bytes_length & 0xFF) as u8;
         bytes[tags_address_start.unwrap() + 2] = ((tags_bytes_length >> 8) & 0xFF) as u8;
@@ -239,7 +236,7 @@ impl JpgReader {
                 .red()
             );
             return match read!(file_iterator) {
-                Ok(_) => Err(Error::ParserError),
+                Ok(_) => Err(Error::Format),
                 Err(e) => Err(e),
             };
         } else {
@@ -254,7 +251,7 @@ impl JpgReader {
         for _ in 0..chunk_length {
             match file_iterator.next() {
                 Some(v) => v?,
-                None => return Err(Error::UnexpectedEOF),
+                None => return Err(Error::EOF),
             };
         }
         Ok(())
@@ -277,7 +274,7 @@ impl JpgReader {
             if *bytes.0 != bytes.1? {
                 // The for returns a tuple: (&u8,Result<u8,E>), the 1st value is the signature, the other is the file
                 info!("Signature checking failed.");
-                return Err(Error::UnknownFormat);
+                return Err(Error::Format);
             }
         }
         Ok(())
@@ -329,7 +326,7 @@ mod tests {
         let mut file = File::open("tests/invalid").unwrap();
         assert_eq!(
             std::mem::discriminant(&JpgReader::read_tags(&mut file).unwrap_err()),
-            std::mem::discriminant(&Error::UnknownFormat)
+            std::mem::discriminant(&Error::Format)
         );
     }
 
@@ -357,7 +354,7 @@ mod tests {
         let tags = TagSet::new();
         assert_eq!(
             std::mem::discriminant(&JpgReader::write_tags(&mut file, &tags).unwrap_err()),
-            std::mem::discriminant(&Error::UnknownFormat)
+            std::mem::discriminant(&Error::Format)
         );
     }
 

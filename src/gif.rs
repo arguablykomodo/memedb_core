@@ -20,7 +20,7 @@ impl GifReader {
 
         // Verify signature
         if bytes[0..6] != *b"GIF89a" {
-            return Err(Error::UnknownFormat);
+            return Err(Error::Format);
         }
         i += 6;
 
@@ -73,7 +73,7 @@ impl GifReader {
                         i += sub_block_size + 1;
                     }
                 }
-                _ => return Err(Error::UnknownFormat),
+                _ => return Err(Error::Format),
             };
         }
     }
@@ -147,7 +147,7 @@ mod tests {
         // mem::discriminant magic is used to compare enums without having to implement PartialEq
         assert_eq!(
             std::mem::discriminant(&GifReader::read_tags(&mut file).unwrap_err()),
-            std::mem::discriminant(&Error::UnknownFormat)
+            std::mem::discriminant(&Error::Format)
         );
     }
 
@@ -174,7 +174,7 @@ mod tests {
         // mem::discriminant magic is used to compare enums without having to implement PartialEq
         assert_eq!(
             std::mem::discriminant(&GifReader::write_tags(&mut file, &tags).unwrap_err()),
-            std::mem::discriminant(&Error::UnknownFormat)
+            std::mem::discriminant(&Error::Format)
         );
     }
 
