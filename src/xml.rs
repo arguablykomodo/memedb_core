@@ -22,7 +22,7 @@ impl XmlTag {
     where
         T: Iterator<Item = String>,
     {
-        let tokens: Vec<String> = iter.take_while(|v| !v.ends_with(">")).collect();
+        let tokens: Vec<String> = iter.take_while(|v| !v.ends_with('>')).collect();
         let tag_type = if tokens[1].chars().nth(1).unwrap() == '/' {
             XmlTagType::Closing
         } else if tokens.last().unwrap().chars().nth(1).unwrap() == '/' {
@@ -34,15 +34,15 @@ impl XmlTag {
             name: tokens[1].to_string(),
             attributes: HashMap::new(),
             value: None,
-            id: id,
+            id,
             parent: None,
             children: vec![],
-            tag_type: tag_type,
+            tag_type,
         };
         if tokens.len() > 2 {
             xml_tag.attributes = HashMap::new();
             for token in &tokens[2..] {
-                let mut token: std::str::Split<_> = token.split("=");
+                let mut token: std::str::Split<_> = token.split('=');
                 xml_tag.attributes.insert(
                     token.next().unwrap().to_string(),
                     token
@@ -53,7 +53,7 @@ impl XmlTag {
                 );
             }
         }
-        return Ok(xml_tag);
+        Ok(xml_tag)
     }
     pub fn get_id(&self) -> usize {
         self.id
@@ -107,17 +107,17 @@ impl XmlTree {
         let mut tree = XmlTree { nodes: vec![] };
         let mut parent_stack: Vec<usize> = vec![];
         let mut tokens_iter: std::iter::Peekable<_> = tokens.into_iter().peekable();
-        loop {
-            let value_peeked: &String = match tokens_iter.peek() {
+        while let Some(value_peeked) = tokens_iter.peek() {
+            /* let value_peeked: &String = match tokens_iter.peek() {
                 Some(v) => v,
                 None => break,
-            };
-            if value_peeked.starts_with("<") {
+            }; */
+            if value_peeked.starts_with('<') {
                 let tag = XmlTag::parse(&mut tokens_iter, tree.get_next_id())?;
                 match tag.tag_type {
                     XmlTagType::Opening => {
                         let inserted_tag_id = tree.push(tag);
-                        if parent_stack.len() > 0 {
+                        if !parent_stack.is_empty() {
                             let parent = parent_stack.last().unwrap();
                             tree.link(*parent, inserted_tag_id);
                         }
@@ -125,7 +125,7 @@ impl XmlTree {
                     }
                     XmlTagType::SelfClosing => {
                         let inserted_tag_id = tree.push(tag);
-                        if parent_stack.len() > 0 {
+                        if !parent_stack.is_empty() {
                             let parent = parent_stack.last().unwrap();
                             tree.link(*parent, inserted_tag_id);
                         }
@@ -143,7 +143,7 @@ impl XmlTree {
                 }
             }
         }
-        return Ok(tree);
+        Ok(tree)
     }
     fn link(&mut self, parent: usize, child: usize) {
         self[child].parent = Some(parent);
@@ -153,7 +153,7 @@ impl XmlTree {
     }
     fn push(&mut self, tag: XmlTag) -> usize {
         self.nodes.push(tag);
-        return self.nodes.len() - 1;
+        self.nodes.len() - 1
     }
     fn get_next_id(&self) -> usize {
         self.nodes.len()
@@ -176,7 +176,7 @@ impl XmlTree {
             },
             Some(&mut finds),
         );
-        return finds;
+        finds
     }
     pub fn traverse_map<F, V>(&self, start: usize, mut f: F, v: V) -> V
     where
@@ -207,14 +207,14 @@ impl std::ops::Index<usize> for XmlTree {
         if index >= self.nodes.len() {
             panic!("Index out of bounds");
         }
-        return self.nodes.get(index).unwrap();
+        self.nodes.get(index).unwrap()
     }
 }
 impl std::ops::IndexMut<usize> for XmlTree {
-    fn index_mut<'a>(&'a mut self, index: usize) -> &'a mut Self::Output {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         if index >= self.nodes.len() {
             panic!("Index out of bounds");
         }
-        return self.nodes.get_mut(index).unwrap();
+        self.nodes.get_mut(index).unwrap()
     }
 }

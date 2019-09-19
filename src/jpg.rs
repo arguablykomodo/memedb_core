@@ -37,13 +37,13 @@ mod log_address {
 #[cfg(not(logAddresses))]
 mod log_address {
     pub trait LogAddress<I: Iterator> {
-        fn log<'a>(self) -> I;
+        fn log(self) -> I;
     }
     impl<I> LogAddress<I> for I
     where
         I: Iterator,
     {
-        fn log<'a>(self) -> I {
+        fn log(self) -> I {
             self
         }
     }
@@ -134,7 +134,7 @@ impl Reader for JpgReader {
         JpgReader::verify_signature(&mut file_iterator)?;
         use std::time::SystemTime;
         let t = SystemTime::now(); // Poor's Man benchmark
-        let mut bytes: Vec<u8> = SIGNATURE.iter().map(|v| *v).collect::<Vec<u8>>();
+        let mut bytes: Vec<u8> = SIGNATURE.iter().copied().collect::<Vec<u8>>();
         for byte in file_iterator {
             bytes.push(byte?);
         }
@@ -155,7 +155,7 @@ impl Reader for JpgReader {
             }
             // This checks if tags were found
             if slice[1] == TAGS_CHUNK_TYPE {
-                if &bytes[addr + 4..addr + 8] == &['h' as u8, 't' as u8, 't' as u8, 'p' as u8] {
+                if &bytes[addr + 4..addr + 8] == b"http" {
                     info!("0xFFE1 found on {}", addr);
                     tags_address_start = Some(addr);
                 } else {
@@ -213,7 +213,7 @@ impl Reader for JpgReader {
         bytes[tags_address_start.unwrap() + 2] = ((tags_bytes_length >> 8) & 0xFF) as u8;
         debug!("Finished in {:?}", t.elapsed().unwrap());
 
-        return Ok(bytes);
+        Ok(bytes)
     }
 }
 impl JpgReader {
@@ -235,13 +235,13 @@ impl JpgReader {
                 )
                 .red()
             );
-            return match read!(file_iterator) {
+            match read!(file_iterator) {
                 Ok(_) => Err(Error::Format),
                 Err(e) => Err(e),
-            };
+            }
         } else {
             debug!("Read {:#02X?}", &chunk_data[chunk_data.len() - 8..]);
-            return Ok(chunk_data);
+            Ok(chunk_data)
         }
     }
     fn skip_chunk_data(
@@ -264,7 +264,7 @@ impl JpgReader {
         chunk_length |= read!(file_iterator)? as usize;
         chunk_length -= 2;
         debug!("Req. chunk of {:#04X} bytes", chunk_length);
-        return Ok(chunk_length);
+        Ok(chunk_length)
     }
     fn verify_signature(
         file_iterator: &mut impl Iterator<Item = Result<u8, std::io::Error>>,
