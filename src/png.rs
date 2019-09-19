@@ -27,12 +27,12 @@ impl Reader for PngReader {
         loop {
             let mut length = 0u32;
             for _ in 0..4 {
-                length = (length << 8) + next!(bytes) as u32;
+                length = (length << 8) + u32::from(next!(bytes));
             }
 
             let mut chunk_type = [0; 4];
-            for i in 0..4 {
-                chunk_type[i] = next!(bytes);
+            for byte in &mut chunk_type {
+                *byte = next!(bytes);
             }
 
             match &chunk_type {
@@ -85,7 +85,7 @@ impl Reader for PngReader {
 
         let mut chunk_length = Vec::new();
         for i in 0..4 {
-            chunk_length.push((tags.len() >> (3 - i) * 8) as u8);
+            chunk_length.push((tags.len() >> ((3 - i) * 8)) as u8);
         }
 
         let mut new_chunk = Vec::new();
@@ -105,7 +105,7 @@ impl Reader for PngReader {
             let length = bytes[i..i + 4]
                 .iter()
                 .enumerate()
-                .fold(0, |acc, (i, b)| (acc + *b as u32) << (3 - i) * 8);
+                .fold(0, |acc, (i, b)| (acc + u32::from(*b)) << ((3 - i) * 8));
             i += 4;
 
             // We do this magic so that we dont borrow bytes twice

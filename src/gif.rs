@@ -11,11 +11,11 @@ impl GifReader {
             0
         } else {
             let size = byte & 0b00000111;
-            3 * 1 << (size + 1)
+            3 << (size + 1)
         }
     }
 
-    fn find_tags(bytes: &Vec<u8>) -> Result<(usize, bool), Error> {
+    fn find_tags(bytes: &[u8]) -> Result<(usize, bool), Error> {
         let mut i: usize = 0;
 
         // Verify signature
@@ -87,7 +87,7 @@ impl Reader for GifReader {
         let (mut i, found) = GifReader::find_tags(&bytes)?;
         let mut tags = TagSet::new();
         if !found {
-            return Ok(tags);
+            Ok(tags)
         } else {
             loop {
                 if bytes[i] == 0 {
@@ -110,7 +110,7 @@ impl Reader for GifReader {
         let mut tag_bytes = Vec::new();
         for tag in &mut tags {
             tag_bytes.push(tag.len() as u8);
-            tag_bytes.append(&mut tag.as_bytes().into_iter().cloned().collect());
+            tag_bytes.append(&mut tag.as_bytes().to_vec());
         }
         tag_bytes.push(0);
 
@@ -121,7 +121,7 @@ impl Reader for GifReader {
             ];
             real_bytes.append(&mut tag_bytes);
             bytes.splice(i..i, real_bytes);
-            return Ok(bytes);
+            Ok(bytes)
         } else {
             let start = i;
             loop {
