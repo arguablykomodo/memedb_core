@@ -134,7 +134,7 @@ impl Reader for JpgReader {
         JpgReader::verify_signature(&mut file_iterator)?;
         use std::time::SystemTime;
         let t = SystemTime::now(); // Poor's Man benchmark
-        let mut bytes: Vec<u8> = SIGNATURE.iter().map(|v|*v).collect::<Vec<u8>>();
+        let mut bytes: Vec<u8> = SIGNATURE.iter().map(|v| *v).collect::<Vec<u8>>();
         for byte in file_iterator {
             bytes.push(byte?);
         }
