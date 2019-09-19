@@ -2,7 +2,13 @@ use crate::error::Error;
 use crate::reader::Reader;
 use crate::TagSet;
 use crc::crc32;
-use std::io::Read;
+use std::io::{BufReader, Read};
+
+macro_rules! next {
+    ($i:ident) => {
+        $i.next().ok_or(Error::EOF)??
+    };
+}
 
 const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
@@ -10,46 +16,53 @@ pub struct PngReader {}
 
 impl Reader for PngReader {
     fn read_tags(file: &mut impl Read) -> Result<TagSet, Error> {
-        let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes)?;
-        let mut i = 0;
+        let mut bytes = BufReader::new(file).bytes();
 
-        if bytes[0..SIGNATURE.len()] != *SIGNATURE {
-            return Err(Error::Format);
+        for byte in SIGNATURE.iter() {
+            if *byte != next!(bytes) {
+                return Err(Error::Format);
+            }
         }
-        i += SIGNATURE.len();
 
         loop {
-            let length = bytes[i..i + 4]
-                .iter()
-                .enumerate()
-                .fold(0, |acc, (i, b)| (acc + *b as usize) << (3 - i) * 8);
-            i += 4;
-
-            let chunk_type: &[u8] = &bytes[i..i + 4];
-            i += 4;
-
-            if chunk_type == *b"meMe" {
-                let mut tags = TagSet::new();
-                let mut text = String::new();
-                for byte in &bytes[i..i + length] {
-                    if *byte == b';' {
-                        tags.insert(text);
-                        text = String::new();
-                    } else {
-                        text.push(*byte as char);
-                    }
-                }
-                return Ok(tags);
+            let mut length = 0u32;
+            for _ in 0..4 {
+                length = (length << 8) + next!(bytes) as u32;
             }
 
-            // All PNG files must end with an IEND chunk
-            if chunk_type == *b"IEND" {
-                return Ok(TagSet::new());
+            let mut chunk_type = [0; 4];
+            for i in 0..4 {
+                chunk_type[i] = next!(bytes);
+            }
+
+            match &chunk_type {
+                b"IEND" => return Ok(TagSet::new()),
+                b"meMe" => {
+                    let mut tags = TagSet::new();
+                    let mut text = String::new();
+
+                    for _ in 0..length {
+                        let byte = next!(bytes);
+                        if byte == b';' {
+                            tags.insert(text);
+                            text = String::new();
+                        } else {
+                            text.push(byte as char);
+                        }
+                    }
+                    return Ok(tags);
+                }
+                _ => {
+                    for _ in 0..length {
+                        next!(bytes);
+                    }
+                }
             }
 
             // Every chunk ends with a 4 byte long checksum
-            i += length + 4;
+            for _ in 0..4 {
+                next!(bytes);
+            }
         }
     }
 
