@@ -1,3 +1,4 @@
+#![allow(clippy::unreadable_literal)]
 use crate::error::Error;
 use crate::reader::Reader;
 use crate::TagSet;
