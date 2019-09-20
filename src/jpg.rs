@@ -52,7 +52,7 @@ mod log_address {
 
 macro_rules! read {
     ($i:ident) => {
-        // Next returns a value of Option<Result<u8, std::io::Error>>
+        // $i.next() returns a value of Option<Result<u8, std::io::Error>>
         $i.next().ok_or(Error::EOF)??
     };
     ($i:ident; peek) => {
@@ -108,13 +108,15 @@ impl Reader for JpgReader {
                         }
                     };
                     info!("This is the XML found: '{}'", chunk_string.yellow());
-                    match JpgReader::parse_xml(&chunk_string) {
-                        Ok(t) => {
-                            tags = t;
-                            break;
-                        }
-                        Err(e) => eprintln!("XML parser error {}", format!("{:?}", e).red()),
+                    tags = JpgReader::parse_xml(&chunk_string)?;
+                    break;
+                /* match JpgReader::parse_xml(&chunk_string) {
+                    Ok(t) => {
+                        tags = t;
+                        break;
                     }
+                    Err(e) => eprintln!("XML parser error {}", format!("{:?}", e).red()),
+                } */
                 } else {
                     JpgReader::skip_chunk_data(&mut file_iterator_ref)?;
                 }
@@ -133,8 +135,8 @@ impl Reader for JpgReader {
         for byte in file_iterator {
             bytes.push(byte?);
         }
-        let mut tags_address_start: Option<usize> = None; // These 2 hold the addresses of the tag's chunk
-        let mut tags_address_end: Option<usize> = None; //
+        let mut tags_start: Option<usize> = None; // These 2 hold the addresses of the tag's chunk
+        let mut tags_end: Option<usize> = None; //
         let windows = bytes.windows(2); // Iterate in pairs
         for (addr, slice) in windows.enumerate() {
             // Skip until chunk
@@ -143,16 +145,16 @@ impl Reader for JpgReader {
             }
             // slice[0] == 0xFF
             // When found another chunk, break if the tags were found
-            if slice[1] != 0x00 && tags_address_start != None {
+            if slice[1] != 0x00 && tags_start != None {
                 info!("Found 0xFFE1 end on {}", addr);
-                tags_address_end = Some(addr);
+                tags_end = Some(addr);
                 break;
             }
             // This checks if tags were found
             if slice[1] == TAGS_CHUNK_TYPE {
                 if &bytes[addr + 4..addr + 8] == b"http" {
                     info!("0xFFE1 found on {}", addr);
-                    tags_address_start = Some(addr);
+                    tags_start = Some(addr);
                 } else {
                     info!(
                         "On {:#06X?} found {:#04X?}",
@@ -163,20 +165,19 @@ impl Reader for JpgReader {
             }
         }
         // If no chunk was found, make the vars point to the end of the file
-        if tags_address_start == None {
+        if tags_start == None {
             info!("This image contains no tags");
-            tags_address_start = Some(bytes.len() - 2);
-            tags_address_end = Some(bytes.len() - 2);
+            tags_start = Some(bytes.len() - 2);
+            tags_end = Some(bytes.len() - 2);
         }
         let mut tags_bytes: Vec<u8> = vec![0xFF, TAGS_CHUNK_TYPE, 0x00, 0x00];
         tags_bytes.append(&mut JpgReader::create_xml(tags));
-        let mut bytes_diff: isize = (tags_address_end.unwrap() - tags_address_start.unwrap())
-            as isize
-            - tags_bytes.len() as isize;
+        let mut bytes_diff: isize =
+            (tags_end.unwrap() - tags_start.unwrap()) as isize - tags_bytes.len() as isize;
         // Take the existing chunk in the file and resize it to fit the new chunk
         if bytes_diff < 0 {
             loop {
-                bytes.insert(tags_address_start.unwrap(), 0x00);
+                bytes.insert(tags_start.unwrap(), 0x00);
                 bytes_diff += 1;
                 if bytes_diff == 0 {
                     break;
@@ -184,7 +185,7 @@ impl Reader for JpgReader {
             }
         } else if bytes_diff > tags_bytes.len() as isize {
             loop {
-                bytes.remove(tags_address_start.unwrap());
+                bytes.remove(tags_start.unwrap());
                 bytes_diff -= 1;
                 if bytes_diff == 0 {
                     break;
@@ -194,7 +195,7 @@ impl Reader for JpgReader {
         // Copy the bytes of the tag's chunk into the file's buffer
         info!("Writting {} ({0:#02X}) bytes", tags_bytes.len());
         for (i, b) in tags_bytes.iter().enumerate() {
-            bytes[tags_address_start.unwrap() + i] = *b;
+            bytes[tags_start.unwrap() + i] = *b;
         }
 
         use std::convert::TryInto;
@@ -204,8 +205,8 @@ impl Reader for JpgReader {
             Ok(v) => v,
             Err(_) => return Err(Error::Format),
         };
-        bytes[tags_address_start.unwrap() + 3] = (tags_bytes_length & 0xFF) as u8;
-        bytes[tags_address_start.unwrap() + 2] = ((tags_bytes_length >> 8) & 0xFF) as u8;
+        bytes[tags_start.unwrap() + 3] = (tags_bytes_length & 0xFF) as u8;
+        bytes[tags_start.unwrap() + 2] = ((tags_bytes_length >> 8) & 0xFF) as u8;
         debug!("Finished in {:?}", t.elapsed().unwrap());
 
         Ok(bytes)
@@ -218,8 +219,7 @@ impl JpgReader {
         let chunk_length: usize = JpgReader::get_chunk_length(&mut file_iterator)?;
         let chunk_data: Vec<u8> = file_iterator
             .take(chunk_length)
-            .map(|v| v.unwrap())
-            .collect();
+            .collect::<Result<Vec<u8>, std::io::Error>>()?;
         if chunk_data.len() != chunk_length {
             error!(
                 "{}",
@@ -242,10 +242,11 @@ impl JpgReader {
     ) -> Result<(), Error> {
         let chunk_length: usize = JpgReader::get_chunk_length(&mut file_iterator)?;
         for _ in 0..chunk_length {
-            match file_iterator.next() {
+            read!(file_iterator);
+            /* match file_iterator.next() {
                 Some(v) => v?,
                 None => return Err(Error::EOF),
-            };
+            }; */
         }
         Ok(())
     }
@@ -262,9 +263,9 @@ impl JpgReader {
     fn verify_signature(
         file_iterator: &mut impl Iterator<Item = Result<u8, std::io::Error>>,
     ) -> Result<(), Error> {
-        for bytes in SIGNATURE.iter().zip(file_iterator) {
+        for (signature_byte, file_byte) in SIGNATURE.iter().zip(file_iterator) {
             // Iterate first bytes of the file and SIGNATURE at the same time
-            if *bytes.0 != bytes.1? {
+            if *signature_byte != file_byte? {
                 // The for returns a tuple: (&u8,Result<u8,E>), the 1st value is the signature, the other is the file
                 info!("Signature checking failed.");
                 return Err(Error::Format);
@@ -278,7 +279,7 @@ impl JpgReader {
             Some(v) => v == KEYWORDS_UUID,
             None => false,
         });
-        let mut tags: TagSet = HashSet::new();
+        let mut tags: TagSet = TagSet::new();
         for i in &finds {
             tree.traverse_map(
                 *i,
@@ -299,13 +300,13 @@ impl JpgReader {
         Ok(tags)
     }
     fn create_xml(tags: &TagSet) -> Vec<u8> {
-        let mut tags_string = String::with_capacity(tags.len() * (8 + 9));
+        let mut tags_string = String::with_capacity(tags.len() * (8 + 10 + 9));
         for tag in tags {
             tags_string.push_str(&format!("<rdf:li>{}</rdf:li>", tag))
         }
         format!(include_str!("template.xml"), tags = tags_string)
             .bytes()
-            .collect::<Vec<u8>>()
+            .collect()
     }
 }
 
