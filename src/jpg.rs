@@ -57,10 +57,7 @@ macro_rules! read {
     };
     ($i:ident; peek) => {
         match $i.peek() {
-            Some(r) => match r {
-                Ok(v) => Some(*v),
-                Err(_) => None,
-            },
+            Some(r) => r.as_ref().ok(),
             None => None,
         }
     };
@@ -82,7 +79,7 @@ impl Reader for JpgReader {
             let read = read!(file_iterator_ref);
             if read == 0xFF {
                 chunk_type = read!(file_iterator_ref);
-                if read!(file_iterator_ref;peek) == Some(0xFF) {
+                if read!(file_iterator_ref;peek) == Some(&0xFF) {
                     info!("Peeked the start of another chunk");
                     continue;
                 }
