@@ -13,7 +13,7 @@ const TAGS_CHUNK_TYPE: u8 = 0xE1;
 const EOF_CHUNK_TYPE: u8 = 0xD9;
 const KEYWORDS_UUID: &str = "\"uuid:faf5bdd5-ba3d-11da-ad31-d33d75182f1b\"";
 
-/* #region Debugging tools */
+// #region Debugging tools
 #[cfg(logAddresses)]
 mod log_address {
     use std::iter::*;
@@ -48,14 +48,12 @@ mod log_address {
         }
     }
 }
-/* #endregion */
+// #endregion
 
 macro_rules! read {
     ($i:ident) => {
-        match $i.next() {
-            Some(r) => r.map_err(|err| err.into()),
-            None => Err(Error::EOF),
-        }
+        // Next returns a value of Option<Result<u8, std::io::Error>>
+        $i.next().ok_or(Error::EOF)??
     };
     ($i:ident; peek) => {
         match $i.peek() {
@@ -81,12 +79,9 @@ impl Reader for JpgReader {
             making them unusable in the next iteration (thus failing even to compile)
             Just declaring a dumb var and pointing it to the desired variable makes it usable in all the iterations */
             let mut file_iterator_ref = &mut file_iterator;
-            let peeked = match read!(file_iterator_ref) {
-                Ok(v) => v,
-                Err(_) => break,
-            };
-            if peeked == 0xFF {
-                chunk_type = read!(file_iterator_ref)?;
+            let read = read!(file_iterator_ref);
+            if read == 0xFF {
+                chunk_type = read!(file_iterator_ref);
                 if read!(file_iterator_ref;peek) == Some(0xFF) {
                     info!("Peeked the start of another chunk");
                     continue;
@@ -226,7 +221,7 @@ impl JpgReader {
             .map(|v| v.unwrap())
             .collect();
         if chunk_data.len() != chunk_length {
-            eprintln!(
+            error!(
                 "{}",
                 format!(
                     "Error: The data captured is shorter than expected\n{} bytes expected, got {}",
@@ -235,10 +230,8 @@ impl JpgReader {
                 )
                 .red()
             );
-            match read!(file_iterator) {
-                Ok(_) => Err(Error::Format),
-                Err(e) => Err(e),
-            }
+            read!(file_iterator);
+            Err(Error::Format)
         } else {
             debug!("Read {:#02X?}", &chunk_data[chunk_data.len() - 8..]);
             Ok(chunk_data)
@@ -260,8 +253,8 @@ impl JpgReader {
         file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, std::io::Error>>>,
     ) -> Result<usize, Error> {
         let mut chunk_length = 0x0000;
-        chunk_length |= (read!(file_iterator)? as usize) << 8;
-        chunk_length |= read!(file_iterator)? as usize;
+        chunk_length |= (read!(file_iterator) as usize) << 8;
+        chunk_length |= read!(file_iterator) as usize;
         chunk_length -= 2;
         debug!("Req. chunk of {:#04X} bytes", chunk_length);
         Ok(chunk_length)
