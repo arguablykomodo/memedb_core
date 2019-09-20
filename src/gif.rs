@@ -117,11 +117,9 @@ impl Reader for GifReader {
 
         let (mut i, found) = GifReader::find_tags(&bytes)?;
         if !found {
-            let mut real_bytes = vec![
-                0x21, 0xFF, 0x0B, b'M', b'E', b'M', b'E', b'T', b'A', b'G', b'S', b'1', b'.', b'0',
-            ];
-            real_bytes.append(&mut tag_bytes);
-            bytes.splice(i..i, real_bytes);
+            let mut insert_bytes = b"\x21\xFF\x0BMEMETAGS1.0".to_vec();
+            insert_bytes.append(&mut tag_bytes);
+            bytes.splice(i..i, insert_bytes);
             Ok(bytes)
         } else {
             let start = i;
