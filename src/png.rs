@@ -66,7 +66,7 @@ impl Reader for PngReader {
         }
     }
 
-    fn write_tags(file: &mut (impl Read), tags: &TagSet) -> Result<Vec<u8>, Error> {
+    fn write_tags(file: &mut impl Read, tags: &TagSet) -> Result<Vec<u8>, Error> {
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)?;
 
