@@ -7,12 +7,9 @@ stable-build:
   stage: build
   image: rust:latest
   script: cargo build
-
-nightly-build:
-  stage: build
-  image: rustlang/rust:nightly
-  script: cargo build
-  allow_failure: true
+  artifacts:
+    paths:
+      - "target/"
 
 stable-lint:
   stage: lint
@@ -22,24 +19,15 @@ stable-lint:
     - cargo fmt -- --check
     - rustup component add clippy
     - cargo clippy
-
-nightly-lint:
-  stage: lint
-  image: rustlang/rust:nightly
-  script:
-    - rustup component add rustfmt
-    - cargo fmt -- --check
-    - rustup component add clippy --toolchain=nightly
-    - cargo clippy
-  allow_failure: true
+  artifacts:
+    paths:
+      - "target/"
+  dependencies:
+    - stable-build
 
 stable-test:
   stage: test
   image: rust:latest
   script: cargo test
-
-nightly-test:
-  stage: test
-  image: rustlang/rust:nightly
-  script: cargo test
-  allow_failure: true
+  dependencies:
+    - stable-lint
