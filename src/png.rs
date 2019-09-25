@@ -89,7 +89,7 @@ impl Reader for PngReader {
         }
 
         let mut new_chunk = Vec::new();
-        new_chunk.append(&mut vec![b'm', b'e', b'M', b'e']);
+        new_chunk.append(&mut b"meMe".to_vec());
         new_chunk.append(&mut tags);
         let checksum = crc32::checksum_ieee(&new_chunk);
         new_chunk.append(&mut vec![
