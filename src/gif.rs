@@ -6,6 +6,8 @@ use std::io::Read;
 
 pub struct GifReader {}
 
+pub const SIGNATURE: &[u8] = b"GIF89a";
+
 impl GifReader {
     fn get_color_table_size(byte: u8) -> usize {
         if byte >> 7 & 1 == 0 {
@@ -20,7 +22,7 @@ impl GifReader {
         let mut i: usize = 0;
 
         // Verify signature
-        if bytes[0..6] != *b"GIF89a" {
+        if bytes[0..6] != *SIGNATURE {
             return Err(Error::Format);
         }
         i += 6;

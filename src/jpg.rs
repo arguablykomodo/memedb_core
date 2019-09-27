@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::io::Read;
 use std::iter::Peekable;
 
-const SIGNATURE: &[u8] = &[0xFF, 0xD8];
+pub const SIGNATURE: &[u8] = &[0xFF, 0xD8];
 const TAGS_CHUNK_TYPE: u8 = 0xE1;
 const EOF_CHUNK_TYPE: u8 = 0xD9;
 const KEYWORDS_UUID: &str = "\"uuid:faf5bdd5-ba3d-11da-ad31-d33d75182f1b\"";

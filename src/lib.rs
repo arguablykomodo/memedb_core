@@ -10,13 +10,50 @@ use reader::Reader;
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
-use std::io::Write;
+use std::io::{BufReader, Read, Write};
 use std::path::Path;
 
 #[macro_use]
 extern crate log;
 
 pub type TagSet = HashSet<String>;
+
+macro_rules! file_types {
+    ($($name:ident),+) => {
+        #[derive(Copy, Clone)]
+        enum FileType {
+            $($name),+
+        }
+
+        const READERS: &[(&[u8], FileType)] = &[
+            $(($name::SIGNATURE, FileType::$name)),+
+        ];
+    };
+}
+
+file_types!(png, jpg, gif);
+
+fn identify_file_type(file: impl Read) -> Result<FileType, Error> {
+    let mut readers = READERS.to_vec();
+    let mut bytes = BufReader::new(file).bytes();
+    loop {
+        let mut sigs_to_remove = vec![];
+        let byte = bytes.next().unwrap().unwrap();
+        for (i, (signature, _)) in readers.iter().enumerate() {
+            if signature[i] != byte {
+                sigs_to_remove.push(i);
+            }
+        }
+        for sig in sigs_to_remove {
+            readers.remove(sig);
+        }
+        match readers.len() {
+            1 => return Ok(readers.get(0).unwrap().1),
+            0 => return Err(Error::Format),
+            _ => (),
+        };
+    }
+}
 
 pub fn read_tags(path: &Path) -> Result<TagSet, Error> {
     info!("Debugging enabled");
