@@ -72,14 +72,9 @@ impl Reader for JpgReader {
         JpgReader::verify_signature(&mut file_iterator)?;
         let mut chunk_type: u8;
         loop {
-            /* Loops in rust have a bug where they consume variables in spite of borrowing them
-            making them unusable in the next iteration (thus failing even to compile)
-            Just declaring a dumb var and pointing it to the desired variable makes it usable in all the iterations */
-            let mut file_iterator_ref = &mut file_iterator;
-            let read = read!(file_iterator_ref);
-            if read == 0xFF {
-                chunk_type = read!(file_iterator_ref);
-                if read!(file_iterator_ref;peek) == Some(&0xFF) {
+            if read!(file_iterator) == 0x0FF {
+                chunk_type = read!(file_iterator);
+                if read!(file_iterator;peek) == Some(&0xFF) {
                     info!("Peeked the start of another chunk");
                     continue;
                 }
@@ -90,7 +85,7 @@ impl Reader for JpgReader {
                     debug!("{}", "EOF".green());
                     break;
                 } else if chunk_type == TAGS_CHUNK_TYPE {
-                    let chunk_data = JpgReader::get_chunk_data(&mut file_iterator_ref)?;
+                    let chunk_data = JpgReader::get_chunk_data(&mut file_iterator)?;
                     let chunk_string;
 
                     if chunk_data[0] != 0x68 {
@@ -100,22 +95,15 @@ impl Reader for JpgReader {
                     chunk_string = match String::from_utf8(chunk_data) {
                         Ok(v) => v,
                         Err(e) => {
-                            error!("Chunk data wasn't an XML (Failed with error {:#X?})", e);
+                            error!("Chunk data wasn't a string (Failed with error {:#X?})", e);
                             continue;
                         }
                     };
                     info!("This is the XML found: '{}'", chunk_string.yellow());
                     tags = JpgReader::parse_xml(&chunk_string)?;
                     break;
-                /* match JpgReader::parse_xml(&chunk_string) {
-                    Ok(t) => {
-                        tags = t;
-                        break;
-                    }
-                    Err(e) => eprintln!("XML parser error {}", format!("{:?}", e).red()),
-                } */
                 } else {
-                    JpgReader::skip_chunk_data(&mut file_iterator_ref)?;
+                    JpgReader::skip_chunk_data(&mut file_iterator)?;
                 }
             } else {
                 error!("Skipping bytes");
@@ -163,20 +151,19 @@ impl Reader for JpgReader {
                 }
             }
         }
+
         // If no chunk was found, make the vars point to the end of the file
-        if tags_start == None {
-            info!("This image contains no tags");
-            tags_start = Some(bytes.len() - 2);
-            tags_end = Some(bytes.len() - 2);
-        }
+        // it is safe to add a new chunk there
+        let tags_end = tags_end.unwrap_or_else(|| bytes.len() - 2);
+        let tags_start = tags_start.unwrap_or_else(|| bytes.len() - 2);
+
         let mut tags_bytes: Vec<u8> = vec![0xFF, TAGS_CHUNK_TYPE, 0x00, 0x00];
         tags_bytes.append(&mut JpgReader::create_xml(tags));
-        let mut bytes_diff: isize =
-            (tags_end.unwrap() - tags_start.unwrap()) as isize - tags_bytes.len() as isize;
+        let mut bytes_diff: isize = (tags_end - tags_start) as isize - tags_bytes.len() as isize;
         // Take the existing chunk in the file and resize it to fit the new chunk
         if bytes_diff < 0 {
             loop {
-                bytes.insert(tags_start.unwrap(), 0x00);
+                bytes.insert(tags_start, 0x00);
                 bytes_diff += 1;
                 if bytes_diff == 0 {
                     break;
@@ -184,7 +171,7 @@ impl Reader for JpgReader {
             }
         } else if bytes_diff > tags_bytes.len() as isize {
             loop {
-                bytes.remove(tags_start.unwrap());
+                bytes.remove(tags_start);
                 bytes_diff -= 1;
                 if bytes_diff == 0 {
                     break;
@@ -194,7 +181,7 @@ impl Reader for JpgReader {
         // Copy the bytes of the tag's chunk into the file's buffer
         info!("Writting {} ({0:#02X}) bytes", tags_bytes.len());
         for (i, b) in tags_bytes.iter().enumerate() {
-            bytes[tags_start.unwrap() + i] = *b;
+            bytes[tags_start + i] = *b;
         }
 
         use std::convert::TryInto;
@@ -204,8 +191,8 @@ impl Reader for JpgReader {
             Ok(v) => v,
             Err(_) => return Err(Error::Format),
         };
-        bytes[tags_start.unwrap() + 3] = (tags_bytes_length & 0xFF) as u8;
-        bytes[tags_start.unwrap() + 2] = ((tags_bytes_length >> 8) & 0xFF) as u8;
+        bytes[tags_start + 3] = (tags_bytes_length & 0xFF) as u8;
+        bytes[tags_start + 2] = ((tags_bytes_length >> 8) & 0xFF) as u8;
         debug!("Finished in {:?}", t.elapsed().unwrap());
 
         Ok(bytes)
@@ -242,10 +229,6 @@ impl JpgReader {
         let chunk_length: usize = JpgReader::get_chunk_length(&mut file_iterator)?;
         for _ in 0..chunk_length {
             read!(file_iterator);
-            /* match file_iterator.next() {
-                Some(v) => v?,
-                None => return Err(Error::EOF),
-            }; */
         }
         Ok(())
     }
