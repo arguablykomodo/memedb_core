@@ -1,3 +1,5 @@
+#[macro_use]
+mod helpers;
 pub mod error;
 mod gif;
 mod jpg;

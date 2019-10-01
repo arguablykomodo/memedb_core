@@ -4,12 +4,6 @@ use crate::TagSet;
 use crc::crc32;
 use std::io::{BufReader, Read};
 
-macro_rules! next {
-    ($i:ident) => {
-        $i.next().ok_or(Error::EOF)??
-    };
-}
-
 pub const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
 pub struct PngReader {}

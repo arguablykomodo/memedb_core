@@ -5,6 +5,7 @@ use crate::xml::{XmlTag, XmlTree};
 use crate::TagSet;
 use colored::*;
 use std::collections::HashSet;
+use std::io;
 use std::io::Read;
 use std::iter::Peekable;
 
@@ -13,68 +14,18 @@ const TAGS_CHUNK_TYPE: u8 = 0xE1;
 const EOF_CHUNK_TYPE: u8 = 0xD9;
 const KEYWORDS_UUID: &str = "\"uuid:faf5bdd5-ba3d-11da-ad31-d33d75182f1b\"";
 
-// #region Debugging tools
-#[cfg(logAddresses)]
-mod log_address {
-    use std::iter::*;
-
-    pub trait LogAddress<Item, I: Iterator<Item = Item>> {
-        fn log<'a>(self) -> Map<Enumerate<I>, &'a Fn((usize, Item)) -> Item>;
-    }
-
-    impl<Item, I> LogAddress<Item, I> for I
-    where
-        I: Iterator<Item = Item>,
-    {
-        fn log<'a>(self) -> Map<Enumerate<I>, &'a Fn((usize, Item)) -> Item> {
-            self.enumerate().map(&|(a, v)| {
-                debug!("Address: 0x{:06X?}", a);
-                v
-            })
-        }
-    }
-}
-#[cfg(not(logAddresses))]
-mod log_address {
-    pub trait LogAddress<I: Iterator> {
-        fn log(self) -> I;
-    }
-    impl<I> LogAddress<I> for I
-    where
-        I: Iterator,
-    {
-        fn log(self) -> I {
-            self
-        }
-    }
-}
-// #endregion
-
-macro_rules! read {
-    ($i:ident) => {
-        // $i.next() returns a value of Option<Result<u8, std::io::Error>>
-        $i.next().ok_or(Error::EOF)??
-    };
-    ($i:ident; peek) => {
-        match $i.peek() {
-            Some(r) => r.as_ref().ok(),
-            None => None,
-        }
-    };
-}
-
 pub struct JpgReader;
 impl Reader for JpgReader {
     fn read_tags(file: &mut impl Read) -> Result<TagSet, Error> {
         let mut tags: TagSet = HashSet::new();
-        use log_address::LogAddress;
+        use crate::helpers::log_address::LogAddress;
         let mut file_iterator: Peekable<_> = file.bytes().log().peekable();
         JpgReader::verify_signature(&mut file_iterator)?;
         let mut chunk_type: u8;
         loop {
-            if read!(file_iterator) == 0x0FF {
-                chunk_type = read!(file_iterator);
-                if read!(file_iterator;peek) == Some(&0xFF) {
+            if next!(file_iterator) == 0x0FF {
+                chunk_type = next!(file_iterator);
+                if next!(file_iterator;peek) == Some(&0xFF) {
                     info!("Peeked the start of another chunk");
                     continue;
                 }
@@ -86,22 +37,20 @@ impl Reader for JpgReader {
                     break;
                 } else if chunk_type == TAGS_CHUNK_TYPE {
                     let chunk_data = JpgReader::get_chunk_data(&mut file_iterator)?;
-                    let chunk_string;
 
-                    if chunk_data[0] != 0x68 {
+                    // XML inside jpg always start with http
+                    if &chunk_data[0..4] != b"http" {
                         continue;
                     }
 
-                    chunk_string = match String::from_utf8(chunk_data) {
-                        Ok(v) => v,
-                        Err(e) => {
-                            error!("Chunk data wasn't a string (Failed with error {:#X?})", e);
-                            continue;
-                        }
-                    };
-                    info!("This is the XML found: '{}'", chunk_string.yellow());
-                    tags = JpgReader::parse_xml(&chunk_string)?;
-                    break;
+                    if let Ok(chunk_string) = String::from_utf8(chunk_data) {
+                        info!("This is the XML found: '{}'", chunk_string.yellow());
+                        tags = JpgReader::parse_xml(&chunk_string)?;
+                        break;
+                    } else {
+                        info!("Chunk-data found couldn't be converted to string");
+                        continue;
+                    }
                 } else {
                     JpgReader::skip_chunk_data(&mut file_iterator)?;
                 }
@@ -121,7 +70,7 @@ impl Reader for JpgReader {
             .copied()
             .map(Ok)
             .chain(file_iterator)
-            .collect::<Result<_, std::io::Error>>()?;
+            .collect::<Result<_, io::Error>>()?;
         let mut tags_start: Option<usize> = None; // These 2 hold the addresses of the tag's chunk
         let mut tags_end: Option<usize> = None; //
         let windows = bytes.windows(2); // Iterate in pairs
@@ -130,8 +79,7 @@ impl Reader for JpgReader {
             if slice[0] != 0xFF {
                 continue;
             }
-            // slice[0] == 0xFF
-            // When found another chunk, break if the tags were found
+            // Break the loop when the start of another chunk is found
             if slice[1] != 0x00 && tags_start != None {
                 info!("Found 0xFFE1 end on {}", addr);
                 tags_end = Some(addr);
@@ -200,12 +148,12 @@ impl Reader for JpgReader {
 }
 impl JpgReader {
     fn get_chunk_data(
-        mut file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, std::io::Error>>>,
+        mut file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, io::Error>>>,
     ) -> Result<Vec<u8>, Error> {
         let chunk_length: usize = JpgReader::get_chunk_length(&mut file_iterator)?;
         let chunk_data: Vec<u8> = file_iterator
             .take(chunk_length)
-            .collect::<Result<Vec<u8>, std::io::Error>>()?;
+            .collect::<Result<Vec<u8>, io::Error>>()?;
         if chunk_data.len() != chunk_length {
             error!(
                 "{}",
@@ -216,34 +164,35 @@ impl JpgReader {
                 )
                 .red()
             );
-            read!(file_iterator);
+            next!(file_iterator);
             Err(Error::Format)
         } else {
             debug!("Read {:#02X?}", &chunk_data[chunk_data.len() - 8..]);
             Ok(chunk_data)
         }
     }
+
     fn skip_chunk_data(
-        mut file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, std::io::Error>>>,
+        mut file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, io::Error>>>,
     ) -> Result<(), Error> {
         let chunk_length: usize = JpgReader::get_chunk_length(&mut file_iterator)?;
         for _ in 0..chunk_length {
-            read!(file_iterator);
+            next!(file_iterator);
         }
         Ok(())
     }
     fn get_chunk_length(
-        file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, std::io::Error>>>,
+        file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, io::Error>>>,
     ) -> Result<usize, Error> {
         let mut chunk_length = 0x0000;
-        chunk_length |= (read!(file_iterator) as usize) << 8;
-        chunk_length |= read!(file_iterator) as usize;
+        chunk_length |= (next!(file_iterator) as usize) << 8;
+        chunk_length |= next!(file_iterator) as usize;
         chunk_length -= 2;
         debug!("Req. chunk of {:#04X} bytes", chunk_length);
         Ok(chunk_length)
     }
     fn verify_signature(
-        file_iterator: &mut impl Iterator<Item = Result<u8, std::io::Error>>,
+        file_iterator: &mut impl Iterator<Item = Result<u8, io::Error>>,
     ) -> Result<(), Error> {
         for (signature_byte, file_byte) in SIGNATURE.iter().zip(file_iterator) {
             // Iterate first bytes of the file and SIGNATURE at the same time
