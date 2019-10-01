@@ -40,6 +40,6 @@ macro_rules! next {
         $i.next().ok_or(Error::EOF)??
     };
     ($i:ident; peek) => {
-        $i.peek().and_then(|v|v.as_ref().ok())
+        $i.peek().and_then(|v| v.as_ref().ok())
     };
 }
