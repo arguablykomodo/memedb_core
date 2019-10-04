@@ -6,7 +6,7 @@ use crate::TagSet;
 use colored::*;
 use std::collections::HashSet;
 use std::io;
-use std::io::Read;
+use std::io::{BufRead, Bytes, Read};
 use std::iter::Peekable;
 
 pub const SIGNATURE: &[u8] = &[0xFF, 0xD8];
@@ -16,11 +16,10 @@ const KEYWORDS_UUID: &str = "\"uuid:faf5bdd5-ba3d-11da-ad31-d33d75182f1b\"";
 
 pub struct JpgReader;
 impl Reader for JpgReader {
-    fn read_tags(file: &mut impl Read) -> Result<TagSet, Error> {
+    fn read_tags(file: &mut Bytes<impl BufRead>) -> Result<TagSet, Error> {
         let mut tags: TagSet = HashSet::new();
         use crate::helpers::log_address::LogAddress;
-        let mut file_iterator: Peekable<_> = file.bytes().log().peekable();
-        JpgReader::verify_signature(&mut file_iterator)?;
+        let mut file_iterator: Peekable<_> = file.log().peekable();
         let mut chunk_type: u8;
         loop {
             if next!(file_iterator) == 0x0FF {
@@ -60,9 +59,10 @@ impl Reader for JpgReader {
         }
         Ok(tags)
     }
-    fn write_tags(file: &mut impl Read, tags: &TagSet) -> Result<Vec<u8>, Error> {
-        let mut file_iterator: _ = file.bytes();
-        JpgReader::verify_signature(&mut file_iterator)?;
+    fn write_tags(
+        file_iterator: &mut Bytes<impl BufRead>,
+        tags: &TagSet,
+    ) -> Result<Vec<u8>, Error> {
         use std::time::SystemTime;
         let t = SystemTime::now(); // Poor's Man benchmark
         let mut bytes: Vec<u8> = SIGNATURE

@@ -2,22 +2,14 @@ use crate::error::Error;
 use crate::reader::Reader;
 use crate::TagSet;
 use crc::crc32;
-use std::io::{BufReader, Read};
+use std::io::{BufRead, Bytes, Read};
 
 pub const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
 pub struct PngReader {}
 
 impl Reader for PngReader {
-    fn read_tags(file: &mut impl Read) -> Result<TagSet, Error> {
-        let mut bytes = BufReader::new(file).bytes();
-
-        for byte in SIGNATURE.iter() {
-            if *byte != next!(bytes) {
-                return Err(Error::Format);
-            }
-        }
-
+    fn read_tags(bytes: &mut Bytes<impl BufRead>) -> Result<TagSet, Error> {
         loop {
             let mut length = 0u32;
             for _ in 0..4 {
@@ -60,13 +52,13 @@ impl Reader for PngReader {
         }
     }
 
-    fn write_tags(file: &mut impl Read, tags: &TagSet) -> Result<Vec<u8>, Error> {
-        let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes)?;
-
-        if bytes[0..SIGNATURE.len()] != *SIGNATURE {
-            return Err(Error::Format);
-        };
+    fn write_tags(file: &mut Bytes<impl BufRead>, tags: &TagSet) -> Result<Vec<u8>, Error> {
+        let mut bytes: Vec<u8> = SIGNATURE
+            .iter()
+            .copied()
+            .map(Ok)
+            .chain(file)
+            .collect::<Result<_, std::io::Error>>()?;
 
         let mut tags: Vec<String> = tags.iter().cloned().collect();
         tags.sort_unstable();

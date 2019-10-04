@@ -12,7 +12,7 @@ use reader::Reader;
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Bytes, Read, Write};
 use std::path::Path;
 
 #[macro_use]
@@ -35,9 +35,8 @@ macro_rules! file_types {
 
 file_types!(png, jpg, gif);
 
-fn identify_file_type(file: impl Read) -> Result<FileType, Error> {
+fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error> {
     let mut readers = READERS.to_vec();
-    let mut bytes = BufReader::new(file).bytes();
     loop {
         let mut sigs_to_remove = vec![];
         let byte = bytes.next().unwrap().unwrap();
@@ -60,12 +59,18 @@ fn identify_file_type(file: impl Read) -> Result<FileType, Error> {
 pub fn read_tags(path: &Path) -> Result<TagSet, Error> {
     info!("Debugging enabled");
     let mut file = File::open(&path)?;
-    match path.extension().and_then(OsStr::to_str) {
-        Some("png") => png::PngReader::read_tags(&mut file),
-        Some("gif") => gif::GifReader::read_tags(&mut file),
-        Some("jpg") | Some("jpeg") => jpg::JpgReader::read_tags(&mut file),
+    let mut bytes = BufReader::new(file).bytes();
+
+    match identify_file_type(&mut bytes)? {
+        FileType::png => png::PngReader::read_tags(&mut bytes),
         _ => Err(Error::Format),
     }
+    // match path.extension().and_then(OsStr::to_str) {
+    //     Some("png") => png::PngReader::read_tags(&mut bytes),
+    //     Some("gif") => gif::GifReader::read_tags(&mut bytes),
+    //     Some("jpg") | Some("jpeg") => jpg::JpgReader::read_tags(&mut bytes),
+    //     _ => Err(Error::Format),
+    // }
 }
 
 pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
