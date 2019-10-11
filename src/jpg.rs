@@ -16,7 +16,9 @@ const KEYWORDS_UUID: &str = "\"uuid:faf5bdd5-ba3d-11da-ad31-d33d75182f1b\"";
 
 pub struct JpgReader;
 impl Reader for JpgReader {
-    fn read_tags(file: &mut Bytes<impl BufRead>) -> Result<TagSet, Error> {
+    fn read_tags(
+        file: &mut impl Iterator<Item = Result<u8, std::io::Error>>,
+    ) -> Result<TagSet, Error> {
         let mut tags: TagSet = HashSet::new();
         use crate::helpers::log_address::LogAddress;
         let mut file_iterator: Peekable<_> = file.log().peekable();
@@ -238,74 +240,5 @@ impl JpgReader {
         format!(include_str!("template.xml"), tags = tags_string)
             .bytes()
             .collect()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs::File;
-
-    #[test]
-    fn test_read_invalid() {
-        let mut file = File::open("tests/invalid").unwrap();
-        assert_eq!(
-            std::mem::discriminant(&JpgReader::read_tags(&mut file).unwrap_err()),
-            std::mem::discriminant(&Error::Format)
-        );
-    }
-
-    #[test]
-    fn test_read_empty() {
-        let mut file = File::open("tests/empty.jpg").unwrap();
-        let tags: Result<TagSet, Error> = JpgReader::read_tags(&mut file);
-        assert!(tags.is_ok());
-        let tags: TagSet = tags.unwrap();
-        assert!(tags.is_empty());
-    }
-
-    #[test]
-    fn test_read_tagged() {
-        let mut file = File::open("tests/tagged.jpg").unwrap();
-        let tags: Result<TagSet, Error> = JpgReader::read_tags(&mut file);
-        assert!(tags.is_ok());
-        let tags: TagSet = tags.unwrap();
-        assert!(tags.contains("pepe"));
-    }
-
-    #[test]
-    fn test_write_invalid() {
-        let mut file = File::open("tests/invalid").unwrap();
-        let tags = TagSet::new();
-        assert_eq!(
-            std::mem::discriminant(&JpgReader::write_tags(&mut file, &tags).unwrap_err()),
-            std::mem::discriminant(&Error::Format)
-        );
-    }
-
-    #[test]
-    fn test_write_empty() {
-        let mut empty = File::open("tests/empty.jpg").unwrap();
-        let mut tags = TagSet::new();
-        tags.insert("pepe".to_string());
-        let empty_bytes = JpgReader::write_tags(&mut empty, &tags).unwrap();
-
-        let mut tagged = File::open("tests/tagged.jpg").unwrap();
-        let mut tagged_bytes = Vec::new();
-        tagged.read_to_end(&mut tagged_bytes).unwrap();
-
-        assert_eq!(empty_bytes, tagged_bytes);
-    }
-
-    #[test]
-    fn test_write_tagged() {
-        let mut file = File::open("tests/tagged.jpg").unwrap();
-        let tags = TagSet::new();
-        let result_bytes = JpgReader::write_tags(&mut file, &tags).unwrap();
-        let mut untagged = File::open("tests/untagged.jpg").unwrap();
-        let mut untagged_bytes = Vec::new();
-        untagged.read_to_end(&mut untagged_bytes).unwrap();
-
-        assert_eq!(result_bytes, untagged_bytes);
     }
 }

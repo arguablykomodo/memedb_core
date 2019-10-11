@@ -33,13 +33,13 @@ macro_rules! file_types {
     };
 }
 
-file_types!(png, jpg, gif);
+file_types!(png, jpg);
 
 fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error> {
     let mut readers = READERS.to_vec();
     loop {
         let mut sigs_to_remove = vec![];
-        let byte = bytes.next().unwrap().unwrap();
+        let byte = next!(bytes);
         for (i, (signature, _)) in readers.iter().enumerate() {
             if signature[i] != byte {
                 sigs_to_remove.push(i);
@@ -58,22 +58,17 @@ fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error
 
 pub fn read_tags(path: &Path) -> Result<TagSet, Error> {
     info!("Debugging enabled");
-    let mut file = File::open(&path)?;
+    let file = File::open(&path)?;
     let mut bytes = BufReader::new(file).bytes();
 
     match identify_file_type(&mut bytes)? {
         FileType::png => png::PngReader::read_tags(&mut bytes),
+        FileType::jpg => jpg::JpgReader::read_tags(&mut bytes),
         _ => Err(Error::Format),
     }
-    // match path.extension().and_then(OsStr::to_str) {
-    //     Some("png") => png::PngReader::read_tags(&mut bytes),
-    //     Some("gif") => gif::GifReader::read_tags(&mut bytes),
-    //     Some("jpg") | Some("jpeg") => jpg::JpgReader::read_tags(&mut bytes),
-    //     _ => Err(Error::Format),
-    // }
 }
 
-pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
+/* pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
     info!("Debugging enabled");
     let mut file = File::open(&path)?;
     let bytes = match path.extension().and_then(OsStr::to_str) {
@@ -85,4 +80,4 @@ pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
     let mut file = OpenOptions::new().write(true).truncate(true).open(&path)?;
     file.write_all(&bytes)?;
     Ok(())
-}
+} */

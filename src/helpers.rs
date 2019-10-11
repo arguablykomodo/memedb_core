@@ -43,3 +43,9 @@ macro_rules! next {
         $i.peek().and_then(|v| v.as_ref().ok())
     };
 }
+
+macro_rules! open_file {
+    ($i:literal, $n:expr) => {
+        BufReader::new(File::open($i).unwrap()).bytes().skip($n)
+    };
+}

@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::reader::Reader;
+use crate::reader::{IoResult, Reader};
 use crate::TagSet;
 use crc::crc32;
 use std::io::{BufRead, Bytes, Read};
@@ -9,7 +9,7 @@ pub const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 pub struct PngReader {}
 
 impl Reader for PngReader {
-    fn read_tags(bytes: &mut Bytes<impl BufRead>) -> Result<TagSet, Error> {
+    fn read_tags(bytes: &mut impl Iterator<Item = IoResult>) -> Result<TagSet, Error> {
         loop {
             let mut length = 0u32;
             for _ in 0..4 {
@@ -128,73 +128,25 @@ mod tests {
 
     use super::*;
     use std::fs::File;
-
-    #[test]
-    fn test_read_invalid() {
-        let mut file = File::open("tests/invalid").unwrap();
-        // mem::discriminant magic is used to compare enums without having to implement PartialEq
-        assert_eq!(
-            std::mem::discriminant(&PngReader::read_tags(&mut file).unwrap_err()),
-            std::mem::discriminant(&Error::Format)
-        );
-    }
+    use std::io::BufReader;
 
     #[test]
     fn test_read_empty() {
-        let mut file = File::open("tests/empty.png").unwrap();
         let tags = TagSet::new();
-        assert_eq!(PngReader::read_tags(&mut file).unwrap(), tags);
+        assert_eq!(
+            PngReader::read_tags(&mut open_file!("tests/empty.png", SIGNATURE.len())).unwrap(),
+            tags
+        );
     }
 
     #[test]
     fn test_read_tagged() {
-        let mut file = File::open("tests/tagged.png").unwrap();
         let mut tags = TagSet::new();
         tags.insert("foo".to_owned());
         tags.insert("bar".to_owned());
-        assert_eq!(PngReader::read_tags(&mut file).unwrap(), tags);
-    }
-
-    #[test]
-    fn test_write_invalid() {
-        let mut file = File::open("tests/invalid").unwrap();
-        let tags = TagSet::new();
-        // mem::discriminant magic is used to compare enums without having to implement PartialEq
         assert_eq!(
-            std::mem::discriminant(&PngReader::write_tags(&mut file, &tags).unwrap_err()),
-            std::mem::discriminant(&Error::Format)
+            PngReader::read_tags(&mut open_file!("tests/tagged.png", SIGNATURE.len())).unwrap(),
+            tags
         );
-    }
-
-    #[test]
-    fn test_write_empty() {
-        let mut file = File::open("tests/empty.png").unwrap();
-
-        let mut tags = TagSet::new();
-        tags.insert("foo".to_owned());
-        tags.insert("bar".to_owned());
-
-        let result_bytes = PngReader::write_tags(&mut file, &tags).unwrap();
-
-        let mut test = File::open("tests/tagged.png").unwrap();
-        let mut test_bytes = Vec::new();
-        test.read_to_end(&mut test_bytes).unwrap();
-
-        assert_eq!(result_bytes, test_bytes);
-    }
-
-    #[test]
-    fn test_write_tagged() {
-        let mut file = File::open("tests/tagged.png").unwrap();
-
-        let tags = TagSet::new();
-
-        let result_bytes = PngReader::write_tags(&mut file, &tags).unwrap();
-
-        let mut test = File::open("tests/untagged.png").unwrap();
-        let mut test_bytes = Vec::new();
-        test.read_to_end(&mut test_bytes).unwrap();
-
-        assert_eq!(result_bytes, test_bytes);
     }
 }
