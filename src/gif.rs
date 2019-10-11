@@ -1,4 +1,4 @@
-#![allow(clippy::unreadable_literal)]
+/* #![allow(clippy::unreadable_literal)]
 use crate::error::Error;
 use crate::reader::Reader;
 use crate::TagSet;
@@ -136,78 +136,4 @@ impl Reader for GifReader {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs::File;
-
-    #[test]
-    fn test_read_invalid() {
-        let mut file = File::open("tests/invalid").unwrap();
-        // mem::discriminant magic is used to compare enums without having to implement PartialEq
-        assert_eq!(
-            std::mem::discriminant(&GifReader::read_tags(&mut file).unwrap_err()),
-            std::mem::discriminant(&Error::Format)
-        );
-    }
-
-    #[test]
-    fn test_read_empty() {
-        let mut file = File::open("tests/empty.gif").unwrap();
-        let tags = TagSet::new();
-        assert_eq!(GifReader::read_tags(&mut file).unwrap(), tags);
-    }
-
-    #[test]
-    fn test_read_tagged() {
-        let mut file = File::open("tests/tagged.gif").unwrap();
-        let mut tags = TagSet::new();
-        tags.insert("foo".to_owned());
-        tags.insert("bar".to_owned());
-        assert_eq!(GifReader::read_tags(&mut file).unwrap(), tags);
-    }
-
-    #[test]
-    fn test_write_invalid() {
-        let mut file = File::open("tests/invalid").unwrap();
-        let tags = TagSet::new();
-        // mem::discriminant magic is used to compare enums without having to implement PartialEq
-        assert_eq!(
-            std::mem::discriminant(&GifReader::write_tags(&mut file, &tags).unwrap_err()),
-            std::mem::discriminant(&Error::Format)
-        );
-    }
-
-    #[test]
-    fn test_write_empty() {
-        let mut file = File::open("tests/empty.gif").unwrap();
-
-        let mut tags = TagSet::new();
-        tags.insert("foo".to_owned());
-        tags.insert("bar".to_owned());
-
-        let result_bytes = GifReader::write_tags(&mut file, &tags).unwrap();
-
-        let mut test = File::open("tests/tagged.gif").unwrap();
-        let mut test_bytes = Vec::new();
-        test.read_to_end(&mut test_bytes).unwrap();
-
-        assert_eq!(result_bytes, test_bytes);
-    }
-
-    #[test]
-    fn test_write_tagged() {
-        let mut file = File::open("tests/tagged.gif").unwrap();
-
-        let tags = TagSet::new();
-
-        let result_bytes = GifReader::write_tags(&mut file, &tags).unwrap();
-
-        let mut test = File::open("tests/untagged.gif").unwrap();
-        let mut test_bytes = Vec::new();
-        test.read_to_end(&mut test_bytes).unwrap();
-
-        assert_eq!(result_bytes, test_bytes);
-    }
-}
+ */
