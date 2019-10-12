@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::log::{debug, error, info};
-use crate::reader::Reader;
+use crate::reader::{IoResult, Reader};
 use crate::xml::{XmlTag, XmlTree};
 use crate::TagSet;
 use colored::*;
@@ -16,9 +16,7 @@ const KEYWORDS_UUID: &str = "\"uuid:faf5bdd5-ba3d-11da-ad31-d33d75182f1b\"";
 
 pub struct JpgReader;
 impl Reader for JpgReader {
-    fn read_tags(
-        file: &mut impl Iterator<Item = Result<u8, std::io::Error>>,
-    ) -> Result<TagSet, Error> {
+    fn read_tags(file: &mut impl Iterator<Item = IoResult>) -> Result<TagSet, Error> {
         let mut tags: TagSet = HashSet::new();
         use crate::helpers::log_address::LogAddress;
         let mut file_iterator: Peekable<_> = file.log().peekable();
@@ -150,7 +148,7 @@ impl Reader for JpgReader {
 }
 impl JpgReader {
     fn get_chunk_data(
-        mut file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, io::Error>>>,
+        mut file_iterator: &mut Peekable<impl Iterator<Item = IoResult>>,
     ) -> Result<Vec<u8>, Error> {
         let chunk_length: usize = JpgReader::get_chunk_length(&mut file_iterator)?;
         let chunk_data: Vec<u8> = file_iterator
@@ -175,7 +173,7 @@ impl JpgReader {
     }
 
     fn skip_chunk_data(
-        mut file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, io::Error>>>,
+        mut file_iterator: &mut Peekable<impl Iterator<Item = IoResult>>,
     ) -> Result<(), Error> {
         let chunk_length: usize = JpgReader::get_chunk_length(&mut file_iterator)?;
         for _ in 0..chunk_length {
@@ -184,7 +182,7 @@ impl JpgReader {
         Ok(())
     }
     fn get_chunk_length(
-        file_iterator: &mut Peekable<impl Iterator<Item = Result<u8, io::Error>>>,
+        file_iterator: &mut Peekable<impl Iterator<Item = IoResult>>,
     ) -> Result<usize, Error> {
         let mut chunk_length = 0x0000;
         chunk_length |= (next!(file_iterator) as usize) << 8;
@@ -193,9 +191,7 @@ impl JpgReader {
         debug!("Req. chunk of {:#04X} bytes", chunk_length);
         Ok(chunk_length)
     }
-    fn verify_signature(
-        file_iterator: &mut impl Iterator<Item = Result<u8, io::Error>>,
-    ) -> Result<(), Error> {
+    fn verify_signature(file_iterator: &mut impl Iterator<Item = IoResult>) -> Result<(), Error> {
         for (signature_byte, file_byte) in SIGNATURE.iter().zip(file_iterator) {
             // Iterate first bytes of the file and SIGNATURE at the same time
             if *signature_byte != file_byte? {
