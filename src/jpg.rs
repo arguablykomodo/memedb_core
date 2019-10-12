@@ -238,3 +238,29 @@ impl JpgReader {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use std::io::BufReader;
+
+    #[test]
+    fn test_read_empty() {
+        let tags = TagSet::new();
+        assert_eq!(
+            JpgReader::read_tags(&mut open_file!("tests/empty.jpg", SIGNATURE.len())).unwrap(),
+            tags
+        );
+    }
+
+    #[test]
+    fn test_read_tagged() {
+        let mut tags = TagSet::new();
+        tags.insert("pepe".to_owned());
+        assert_eq!(
+            JpgReader::read_tags(&mut open_file!("tests/tagged.jpg", SIGNATURE.len())).unwrap(),
+            tags
+        );
+    }
+}
