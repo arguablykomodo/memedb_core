@@ -49,3 +49,15 @@ macro_rules! open_file {
         BufReader::new(File::open($i).unwrap()).bytes().skip($n)
     };
 }
+
+macro_rules! tagset {
+    {$($tag:expr),*} => {
+        {
+            let mut m = TagSet::new();
+            $(
+                m.insert($tag.to_string());
+            )*
+            m
+        }
+    };
+}

@@ -60,7 +60,7 @@ impl Reader for JpgReader {
         Ok(tags)
     }
     fn write_tags(
-        file_iterator: &mut Bytes<impl BufRead>,
+        file_iterator: &mut impl Iterator<Item = IoResult>,
         tags: &TagSet,
     ) -> Result<Vec<u8>, Error> {
         use std::time::SystemTime;
@@ -262,5 +262,33 @@ mod tests {
             JpgReader::read_tags(&mut open_file!("tests/tagged.jpg", SIGNATURE.len())).unwrap(),
             tags
         );
+    }
+
+    #[test]
+    fn test_write_empty() {
+        let mut empty = open_file!("tests/empty.jpg", SIGNATURE.len());
+        let tags: TagSet = tagset! {"pepe"};
+        let empty_tagged_bytes: Vec<u8> =
+            JpgReader::write_tags(&mut empty, &tags).expect("Error in write_tags");
+        let tagged = open_file!("tests/tagged.jpg", 0);
+        let tagged_bytes: Vec<u8> = tagged
+            .collect::<Result<Vec<u8>, io::Error>>()
+            .expect("IO error");
+        assert_eq!(tagged_bytes, empty_tagged_bytes);
+    }
+
+    #[test]
+    fn test_write_tagged() {
+        let tags = tagset! {};
+
+        let mut tagme = open_file!("tests/tagged.jpg", SIGNATURE.len());
+        let tagme_bytes = JpgReader::write_tags(&mut tagme, &tags).unwrap();
+
+        let mut untagged = open_file!("tests/untagged.jpg", 0);
+        let untagged_bytes: Vec<u8> = untagged
+            .collect::<Result<Vec<u8>, io::Error>>()
+            .expect("IO error");
+
+        assert_eq!(tagme_bytes, untagged_bytes);
     }
 }

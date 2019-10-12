@@ -52,7 +52,7 @@ impl Reader for PngReader {
         }
     }
 
-    fn write_tags(file: &mut Bytes<impl BufRead>, tags: &TagSet) -> Result<Vec<u8>, Error> {
+    fn write_tags(file: &mut impl Iterator<Item = IoResult>, tags: &TagSet) -> Result<Vec<u8>, Error> {
         let mut bytes: Vec<u8> = SIGNATURE
             .iter()
             .copied()
