@@ -68,16 +68,17 @@ pub fn read_tags(path: &Path) -> Result<TagSet, Error> {
     }
 }
 
-/* pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
-    info!("Debugging enabled");
-    let mut file = File::open(&path)?;
-    let bytes = match path.extension().and_then(OsStr::to_str) {
-        Some("png") => png::PngReader::write_tags(&mut file, &tags)?,
-        Some("gif") => gif::GifReader::write_tags(&mut file, &tags)?,
-        Some("jpg") | Some("jpeg") => jpg::JpgReader::write_tags(&mut file, &tags)?,
-        _ => return Err(Error::Format),
+pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
+    let file = File::open(&path)?;
+    let mut bytes = BufReader::new(file).bytes();
+
+    let bytes = match identify_file_type(&mut bytes)? {
+        FileType::png => png::PngReader::write_tags(&mut bytes, &tags)?,
+        FileType::jpg => jpg::JpgReader::write_tags(&mut bytes, &tags)?,
+        _ => Err(Error::Format)?, // <-- This is epic
     };
     let mut file = OpenOptions::new().write(true).truncate(true).open(&path)?;
     file.write_all(&bytes)?;
+
     Ok(())
-} */
+}
