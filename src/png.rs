@@ -131,7 +131,7 @@ mod tests {
 
     use super::*;
     use std::fs::File;
-    use std::io::BufReader;
+    use std::io::{BufReader, Error};
 
     #[test]
     fn test_read_empty() {
@@ -151,5 +151,33 @@ mod tests {
             PngReader::read_tags(&mut open_file!("tests/tagged.png", SIGNATURE.len())).unwrap(),
             tags
         );
+    }
+
+    #[test]
+    fn test_write_empty() {
+        let mut empty = open_file!("tests/empty.png", SIGNATURE.len());
+        let tags: TagSet = tagset! {"foo","bar"};
+        let empty_tagged_bytes: Vec<u8> =
+            PngReader::write_tags(&mut empty, &tags).expect("Error in write_tags");
+        let tagged = open_file!("tests/tagged.png", 0);
+        let tagged_bytes: Vec<u8> = tagged
+            .collect::<Result<Vec<u8>, Error>>()
+            .expect("IO error");
+        assert_eq!(tagged_bytes, empty_tagged_bytes);
+    }
+
+    #[test]
+    fn test_write_tagged() {
+        let tags = tagset! {};
+
+        let mut tagme = open_file!("tests/tagged.png", SIGNATURE.len());
+        let tagme_bytes = PngReader::write_tags(&mut tagme, &tags).unwrap();
+
+        let mut untagged = open_file!("tests/untagged.png", 0);
+        let untagged_bytes: Vec<u8> = untagged
+            .collect::<Result<Vec<u8>, Error>>()
+            .expect("IO error");
+
+        assert_eq!(tagme_bytes, untagged_bytes);
     }
 }
