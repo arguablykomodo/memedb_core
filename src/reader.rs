@@ -1,6 +1,5 @@
 use crate::error::Error;
 use crate::TagSet;
-use std::io::{BufRead, Bytes, Read};
 
 pub type IoResult = Result<u8, std::io::Error>;
 

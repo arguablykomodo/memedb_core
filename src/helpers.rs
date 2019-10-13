@@ -53,13 +53,10 @@ macro_rules! open_file {
 }
 
 macro_rules! tagset {
-    {$($tag:expr),*} => {
-        {
-            let mut m = TagSet::new();
-            $(
-                m.insert($tag.to_string());
-            )*
-            m
-        }
-    };
+    {} => { TagSet::new() };
+    {$($tag:expr),+} => {{
+        let mut m = TagSet::new();
+        $(m.insert($tag.to_string());)*
+        m
+    }};
 }

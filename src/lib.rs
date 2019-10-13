@@ -10,7 +10,6 @@ mod xml;
 use error::Error;
 use reader::Reader;
 use std::collections::HashSet;
-use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Bytes, Read, Write};
 use std::path::Path;
@@ -23,6 +22,7 @@ pub type TagSet = HashSet<String>;
 macro_rules! file_types {
     ($($name:ident),+) => {
         #[derive(Copy, Clone)]
+        #[allow(non_camel_case_types)]
         enum FileType {
             $($name),+
         }
@@ -75,7 +75,7 @@ pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
     let bytes = match identify_file_type(&mut bytes)? {
         FileType::png => png::PngReader::write_tags(&mut bytes, &tags)?,
         FileType::jpg => jpg::JpgReader::write_tags(&mut bytes, &tags)?,
-        _ => Err(Error::Format)?, // <-- This is epic
+        _ => return Err(Error::Format), // <-- Now thats what i call pwetty epic B)
     };
     let mut file = OpenOptions::new().write(true).truncate(true).open(&path)?;
     file.write_all(&bytes)?;

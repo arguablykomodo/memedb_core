@@ -1,10 +1,8 @@
 use crate::error::Error;
 use crate::reader::{IoResult, Reader};
 use crate::TagSet;
-use crc::crc32;
 use crc::crc32::checksum_ieee;
 use std::io;
-use std::io::{BufRead, Bytes, Error as IoError, Read};
 
 macro_rules! compose {
     ($i:expr) => {
@@ -120,7 +118,7 @@ impl Reader for PngReader {
 mod tests {
     use super::*;
     use std::fs::File;
-    use std::io::BufReader;
+    use std::io::{BufReader, Read};
 
     #[test]
     fn test_read_empty() {
