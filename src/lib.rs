@@ -33,7 +33,7 @@ macro_rules! file_types {
     };
 }
 
-file_types!(png, jpg);
+file_types!(png, jpg, gif);
 
 fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error> {
     let mut readers = READERS.to_vec();
