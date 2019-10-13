@@ -5,7 +5,7 @@ use crate::xml::{XmlTag, XmlTree};
 use crate::TagSet;
 use colored::*;
 use std::collections::HashSet;
-use std::io::{BufRead, Bytes, Error as IoError, Read};
+use std::io::Error as IoError;
 use std::iter::Peekable;
 
 pub const SIGNATURE: &[u8] = &[0xFF, 0xD8];
@@ -191,17 +191,7 @@ impl JpgReader {
         debug!("Req. chunk of {:#04X} bytes", chunk_length);
         Ok(chunk_length)
     }
-    fn verify_signature(file_iterator: &mut impl Iterator<Item = IoResult>) -> Result<(), Error> {
-        for (signature_byte, file_byte) in SIGNATURE.iter().zip(file_iterator) {
-            // Iterate first bytes of the file and SIGNATURE at the same time
-            if *signature_byte != file_byte? {
-                // The for returns a tuple: (&u8,Result<u8,E>), the 1st value is the signature, the other is the file
-                info!("Signature checking failed.");
-                return Err(Error::Format);
-            }
-        }
-        Ok(())
-    }
+
     fn parse_xml(xml: &str) -> Result<TagSet, Error> {
         let tree = XmlTree::parse(xml.to_string())?;
         let finds = tree.find_elements(|e: &XmlTag| match e.attributes.get("rdf:about") {
@@ -243,7 +233,7 @@ impl JpgReader {
 mod tests {
     use super::*;
     use std::fs::File;
-    use std::io::BufReader;
+    use std::io::{BufReader, Read};
 
     #[test]
     fn test_read_empty() {
@@ -283,7 +273,7 @@ mod tests {
         let mut tagme = open_file!("tests/tagged.jpg", SIGNATURE.len());
         let tagme_bytes = JpgReader::write_tags(&mut tagme, &tags).unwrap();
 
-        let mut untagged = open_file!("tests/untagged.jpg", 0);
+        let untagged = open_file!("tests/untagged.jpg", 0);
         let untagged_bytes: Vec<u8> = untagged
             .collect::<Result<Vec<u8>, IoError>>()
             .expect("IO error");

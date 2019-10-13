@@ -10,7 +10,7 @@ pub const SIGNATURE: &[u8] = b"GIF89a";
 
 impl Reader for GifReader {
     fn read_tags(file: &mut impl Iterator<Item = IoResult>) -> Result<TagSet, Error> {
-        let mut bytes = file.collect::<Result<Vec<u8>, IoError>>()?;
+        let bytes = file.collect::<Result<Vec<u8>, IoError>>()?;
 
         let (mut i, found) = GifReader::find_tags(&bytes)?;
         let mut tags = TagSet::new();
@@ -49,7 +49,7 @@ impl Reader for GifReader {
         }
         tag_bytes.push(0);
 
-        let (mut i, found) = GifReader::find_tags(&bytes[SIGNATURE.len()..])?; // Skip signature, but find tags as if it didn't existed
+        let (i, found) = GifReader::find_tags(&bytes[SIGNATURE.len()..])?; // Skip signature, but find tags as if it didn't existed
         let mut i = i + SIGNATURE.len(); // add SIGNATURE.len() to i, to include SIGNATURE
         if !found {
             let mut insert_bytes = b"\x21\xFF\x0BMEMETAGS1.0".to_vec();
