@@ -49,8 +49,8 @@ impl Reader for GifReader {
         }
         tag_bytes.push(0);
 
-        let (mut i, found) = GifReader::find_tags(&bytes[  SIGNATURE.len()..  ])?;// Skip signature, but find tags as if it didn't existed
-        let mut i = i + SIGNATURE.len();// add SIGNATURE.len() to i, to include SIGNATURE
+        let (mut i, found) = GifReader::find_tags(&bytes[SIGNATURE.len()..])?; // Skip signature, but find tags as if it didn't existed
+        let mut i = i + SIGNATURE.len(); // add SIGNATURE.len() to i, to include SIGNATURE
         if !found {
             let mut insert_bytes = b"\x21\xFF\x0BMEMETAGS1.0".to_vec();
             insert_bytes.append(&mut tag_bytes);
