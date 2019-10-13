@@ -5,8 +5,7 @@ use crate::xml::{XmlTag, XmlTree};
 use crate::TagSet;
 use colored::*;
 use std::collections::HashSet;
-use std::io;
-use std::io::{BufRead, Bytes, Read};
+use std::io::{BufRead, Bytes, Error as IoError, Read};
 use std::iter::Peekable;
 
 pub const SIGNATURE: &[u8] = &[0xFF, 0xD8];
@@ -70,7 +69,7 @@ impl Reader for JpgReader {
             .copied()
             .map(Ok)
             .chain(file_iterator)
-            .collect::<Result<_, io::Error>>()?;
+            .collect::<Result<_, IoError>>()?;
         let mut tags_start: Option<usize> = None; // These 2 hold the addresses of the tag's chunk
         let mut tags_end: Option<usize> = None; //
         let windows = bytes.windows(2); // Iterate in pairs
@@ -146,6 +145,7 @@ impl Reader for JpgReader {
         Ok(bytes)
     }
 }
+
 impl JpgReader {
     fn get_chunk_data(
         mut file_iterator: &mut Peekable<impl Iterator<Item = IoResult>>,
@@ -153,7 +153,7 @@ impl JpgReader {
         let chunk_length: usize = JpgReader::get_chunk_length(&mut file_iterator)?;
         let chunk_data: Vec<u8> = file_iterator
             .take(chunk_length)
-            .collect::<Result<Vec<u8>, io::Error>>()?;
+            .collect::<Result<Vec<u8>, IoError>>()?;
         if chunk_data.len() != chunk_length {
             error!(
                 "{}",
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn test_read_empty() {
-        let tags = TagSet::new();
+        let tags = tagset! {};
         assert_eq!(
             JpgReader::read_tags(&mut open_file!("tests/empty.jpg", SIGNATURE.len())).unwrap(),
             tags
@@ -256,8 +256,7 @@ mod tests {
 
     #[test]
     fn test_read_tagged() {
-        let mut tags = TagSet::new();
-        tags.insert("pepe".to_owned());
+        let tags = tagset! {"pepe"};
         assert_eq!(
             JpgReader::read_tags(&mut open_file!("tests/tagged.jpg", SIGNATURE.len())).unwrap(),
             tags
@@ -272,7 +271,7 @@ mod tests {
             JpgReader::write_tags(&mut empty, &tags).expect("Error in write_tags");
         let tagged = open_file!("tests/tagged.jpg", 0);
         let tagged_bytes: Vec<u8> = tagged
-            .collect::<Result<Vec<u8>, io::Error>>()
+            .collect::<Result<Vec<u8>, IoError>>()
             .expect("IO error");
         assert_eq!(tagged_bytes, empty_tagged_bytes);
     }
@@ -286,7 +285,7 @@ mod tests {
 
         let mut untagged = open_file!("tests/untagged.jpg", 0);
         let untagged_bytes: Vec<u8> = untagged
-            .collect::<Result<Vec<u8>, io::Error>>()
+            .collect::<Result<Vec<u8>, IoError>>()
             .expect("IO error");
 
         assert_eq!(tagme_bytes, untagged_bytes);

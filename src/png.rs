@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::reader::{IoResult, Reader};
 use crate::TagSet;
 use crc::crc32;
-use std::io::{BufRead, Bytes, Read};
+use std::io::{BufRead, Bytes, Read, Error as IoError};
 
 pub const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
@@ -61,7 +61,7 @@ impl Reader for PngReader {
             .copied()
             .map(Ok)
             .chain(file)
-            .collect::<Result<_, std::io::Error>>()?;
+            .collect::<Result<_, IoError>>()?;
 
         let mut tags: Vec<String> = tags.iter().cloned().collect();
         tags.sort_unstable();
@@ -131,7 +131,7 @@ mod tests {
 
     use super::*;
     use std::fs::File;
-    use std::io::{BufReader, Error};
+    use std::io::{BufReader};
 
     #[test]
     fn test_read_empty() {
@@ -144,9 +144,7 @@ mod tests {
 
     #[test]
     fn test_read_tagged() {
-        let mut tags = TagSet::new();
-        tags.insert("foo".to_owned());
-        tags.insert("bar".to_owned());
+        let tags: TagSet = tagset! {"foo","bar"};
         assert_eq!(
             PngReader::read_tags(&mut open_file!("tests/tagged.png", SIGNATURE.len())).unwrap(),
             tags
@@ -161,7 +159,7 @@ mod tests {
             PngReader::write_tags(&mut empty, &tags).expect("Error in write_tags");
         let tagged = open_file!("tests/tagged.png", 0);
         let tagged_bytes: Vec<u8> = tagged
-            .collect::<Result<Vec<u8>, Error>>()
+            .collect::<Result<Vec<u8>, IoError>>()
             .expect("IO error");
         assert_eq!(tagged_bytes, empty_tagged_bytes);
     }
@@ -175,7 +173,7 @@ mod tests {
 
         let mut untagged = open_file!("tests/untagged.png", 0);
         let untagged_bytes: Vec<u8> = untagged
-            .collect::<Result<Vec<u8>, Error>>()
+            .collect::<Result<Vec<u8>, IoError>>()
             .expect("IO error");
 
         assert_eq!(tagme_bytes, untagged_bytes);
