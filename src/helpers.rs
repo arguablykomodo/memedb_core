@@ -46,7 +46,9 @@ macro_rules! next {
 
 macro_rules! open_file {
     ($i:literal, $n:expr) => {
-        BufReader::new(File::open($i).unwrap()).bytes().skip($n)
+        BufReader::new(File::open($i).expect(concat!("Error opening file ", $i)))
+            .bytes()
+            .skip($n)
     };
 }
 
