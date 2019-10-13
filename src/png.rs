@@ -42,7 +42,7 @@ impl Reader for PngReader {
             let chunk_type = &[next!(bytes), next!(bytes), next!(bytes), next!(bytes)];
 
             match chunk_type {
-                b"IEND" => return Ok(tagset! {}),
+                b"IEND" => return Ok(TagSet::new()),
                 b"meMe" => {
                     let mut tags = TagSet::new();
                     let mut tag = String::new();
@@ -113,44 +113,4 @@ impl Reader for PngReader {
 
 // CRC verifier:
 // http://www.libpng.org/pub/png/apps/pngcheck.html
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs::File;
-    use std::io::{BufReader, Read};
-
-    #[test]
-    fn test_read_empty() {
-        let mut file = open_file!("tests/empty.png", SIGNATURE.len());
-        let result = PngReader::read_tags(&mut file).unwrap();
-        assert_eq!(result, tagset! {});
-    }
-
-    #[test]
-    fn test_read_tagged() {
-        let mut file = open_file!("tests/tagged.png", SIGNATURE.len());
-        let result = PngReader::read_tags(&mut file).unwrap();
-        assert_eq!(result, tagset! {"foo", "bar"});
-    }
-
-    #[test]
-    fn test_write_empty() {
-        let mut empty = open_file!("tests/empty.png", SIGNATURE.len());
-        let result = PngReader::write_tags(&mut empty, &tagset! {"foo", "bar"}).unwrap();
-        let tagged = open_file!("tests/tagged.png", 0)
-            .map(|b| b.unwrap())
-            .collect::<Vec<u8>>();
-        assert_eq!(result, tagged);
-    }
-
-    #[test]
-    fn test_write_tagged() {
-        let mut tagged = open_file!("tests/tagged.png", SIGNATURE.len());
-        let result = PngReader::write_tags(&mut tagged, &tagset! {}).unwrap();
-        let empty = open_file!("tests/untagged.png", 0)
-            .map(|b| b.unwrap())
-            .collect::<Vec<u8>>();
-        assert_eq!(result, empty);
-    }
-}
+reader_tests!(PngReader, "png");

@@ -1,4 +1,3 @@
-// #region Log Address trait
 #[cfg(logAddresses)]
 pub mod log_address {
     use std::iter::*;
@@ -19,6 +18,7 @@ pub mod log_address {
         }
     }
 }
+
 #[cfg(not(logAddresses))]
 pub mod log_address {
     pub trait LogAddress<I: Iterator> {
@@ -33,7 +33,6 @@ pub mod log_address {
         }
     }
 }
-// #endregion
 
 macro_rules! next {
     ($i:ident) => {
@@ -42,21 +41,4 @@ macro_rules! next {
     ($i:ident; peek) => {
         $i.peek().and_then(|v| v.as_ref().ok())
     };
-}
-
-macro_rules! open_file {
-    ($i:literal, $n:expr) => {
-        BufReader::new(File::open($i).expect(concat!("Error opening file ", $i)))
-            .bytes()
-            .skip($n)
-    };
-}
-
-macro_rules! tagset {
-    {} => { TagSet::new() };
-    {$($tag:expr),+} => {{
-        let mut m = TagSet::new();
-        $(m.insert($tag.to_string());)*
-        m
-    }};
 }

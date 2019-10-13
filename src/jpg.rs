@@ -1,9 +1,9 @@
 use crate::error::Error;
-use crate::log::{debug, error, info};
 use crate::reader::{IoResult, Reader};
 use crate::xml::{XmlTag, XmlTree};
 use crate::TagSet;
 use colored::*;
+use log::{debug, error, info};
 use std::collections::HashSet;
 use std::io::Error as IoError;
 use std::iter::Peekable;
@@ -229,55 +229,4 @@ impl JpgReader {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs::File;
-    use std::io::{BufReader, Read};
-
-    #[test]
-    fn test_read_empty() {
-        let tags = tagset! {};
-        assert_eq!(
-            JpgReader::read_tags(&mut open_file!("tests/empty.jpg", SIGNATURE.len())).unwrap(),
-            tags
-        );
-    }
-
-    #[test]
-    fn test_read_tagged() {
-        let tags = tagset! {"pepe"};
-        assert_eq!(
-            JpgReader::read_tags(&mut open_file!("tests/tagged.jpg", SIGNATURE.len())).unwrap(),
-            tags
-        );
-    }
-
-    #[test]
-    fn test_write_empty() {
-        let mut empty = open_file!("tests/empty.jpg", SIGNATURE.len());
-        let tags: TagSet = tagset! {"pepe"};
-        let empty_tagged_bytes: Vec<u8> =
-            JpgReader::write_tags(&mut empty, &tags).expect("Error in write_tags");
-        let tagged = open_file!("tests/tagged.jpg", 0);
-        let tagged_bytes: Vec<u8> = tagged
-            .collect::<Result<Vec<u8>, IoError>>()
-            .expect("IO error");
-        assert_eq!(tagged_bytes, empty_tagged_bytes);
-    }
-
-    #[test]
-    fn test_write_tagged() {
-        let tags = tagset! {};
-
-        let mut tagme = open_file!("tests/tagged.jpg", SIGNATURE.len());
-        let tagme_bytes = JpgReader::write_tags(&mut tagme, &tags).unwrap();
-
-        let untagged = open_file!("tests/untagged.jpg", 0);
-        let untagged_bytes: Vec<u8> = untagged
-            .collect::<Result<Vec<u8>, IoError>>()
-            .expect("IO error");
-
-        assert_eq!(tagme_bytes, untagged_bytes);
-    }
-}
+reader_tests!(JpgReader, "jpg");

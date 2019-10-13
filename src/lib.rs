@@ -1,5 +1,8 @@
 #[macro_use]
 mod helpers;
+#[macro_use]
+mod reader_tests;
+
 pub mod error;
 mod gif;
 mod jpg;
@@ -13,9 +16,6 @@ use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Bytes, Read, Write};
 use std::path::Path;
-
-#[macro_use]
-extern crate log;
 
 pub type TagSet = HashSet<String>;
 
@@ -57,7 +57,6 @@ fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error
 }
 
 pub fn read_tags(path: &Path) -> Result<TagSet, Error> {
-    info!("Debugging enabled");
     let file = File::open(&path)?;
     let mut bytes = BufReader::new(file).bytes();
 
@@ -77,6 +76,7 @@ pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
         FileType::jpg => jpg::JpgReader::write_tags(&mut bytes, &tags)?,
         _ => return Err(Error::Format), // <-- Now thats what i call pwetty epic B)
     };
+
     let mut file = OpenOptions::new().write(true).truncate(true).open(&path)?;
     file.write_all(&bytes)?;
 
