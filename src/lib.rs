@@ -63,7 +63,7 @@ pub fn read_tags(path: &Path) -> Result<TagSet, Error> {
     match identify_file_type(&mut bytes)? {
         FileType::png => png::PngReader::read_tags(&mut bytes),
         FileType::jpg => jpg::JpgReader::read_tags(&mut bytes),
-        _ => Err(Error::Format),
+        FileType::gif => gif::GifReader::read_tags(&mut bytes),
     }
 }
 
@@ -74,7 +74,7 @@ pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
     let bytes = match identify_file_type(&mut bytes)? {
         FileType::png => png::PngReader::write_tags(&mut bytes, &tags)?,
         FileType::jpg => jpg::JpgReader::write_tags(&mut bytes, &tags)?,
-        _ => return Err(Error::Format), // <-- Now thats what i call pwetty epic B)
+        FileType::gif => gif::GifReader::write_tags(&mut bytes, &tags)?,
     };
 
     let mut file = OpenOptions::new().write(true).truncate(true).open(&path)?;
