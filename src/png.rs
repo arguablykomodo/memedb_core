@@ -69,7 +69,7 @@ impl Reader for PngReader {
     }
 
     fn write_tags(
-        bytes: &mut impl Iterator<Item = IoResult>,
+        file: &mut impl Iterator<Item = IoResult>,
         tags: &TagSet,
     ) -> Result<Vec<u8>, Error> {
         let mut tags: Vec<&String> = tags.iter().collect();
@@ -86,8 +86,10 @@ impl Reader for PngReader {
         chunk.append(&mut tags);
         chunk.extend(&decompose!(checksum_ieee(&chunk[4..])));
 
-        let mut bytes = bytes.collect::<Result<Vec<u8>, io::Error>>()?;
-        let mut i = 0;
+        let mut bytes = Vec::new();
+        bytes.extend(SIGNATURE);
+        bytes.append(&mut file.collect::<Result<Vec<u8>, io::Error>>()?);
+        let mut i = SIGNATURE.len();
         loop {
             let length = compose!(&bytes[i..i + 4]);
             i += 4;
@@ -138,7 +140,7 @@ mod tests {
     fn test_write_empty() {
         let mut empty = open_file!("tests/empty.png", SIGNATURE.len());
         let result = PngReader::write_tags(&mut empty, &tagset! {"foo", "bar"}).unwrap();
-        let tagged = open_file!("tests/tagged.png", SIGNATURE.len())
+        let tagged = open_file!("tests/tagged.png", 0)
             .map(|b| b.unwrap())
             .collect::<Vec<u8>>();
         assert_eq!(result, tagged);
@@ -148,7 +150,7 @@ mod tests {
     fn test_write_tagged() {
         let mut tagged = open_file!("tests/tagged.png", SIGNATURE.len());
         let result = PngReader::write_tags(&mut tagged, &tagset! {}).unwrap();
-        let empty = open_file!("tests/untagged.png", SIGNATURE.len())
+        let empty = open_file!("tests/untagged.png", 0)
             .map(|b| b.unwrap())
             .collect::<Vec<u8>>();
         assert_eq!(result, empty);
