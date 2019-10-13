@@ -83,12 +83,6 @@ impl GifReader {
     fn find_tags(bytes: &[u8]) -> Result<(usize, bool), Error> {
         let mut i: usize = 0;
 
-        // Verify signature
-        /* if bytes[0..6] != *SIGNATURE {
-            return Err(Error::Format);
-        }
-        i += 6; */
-
         // Get info from descriptor
         let color_table_size = GifReader::get_color_table_size(bytes[i + 4]);
         i += 7;
@@ -138,7 +132,7 @@ impl GifReader {
                         i += sub_block_size + 1;
                     }
                 }
-                _ => return Err(Error::Format),
+                _ => return Err(Error::Parser),
             };
         }
     }

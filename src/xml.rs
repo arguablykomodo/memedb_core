@@ -132,14 +132,14 @@ impl XmlTree {
                     }
                     XmlTagType::Closing => {
                         if parent_stack.pop().is_none() {
-                            return Err(Error::Format);
+                            return Err(Error::Parser);
                         }
                     }
                 }
             } else {
                 match tree.nodes.last_mut() {
                     Some(node) => node.value = Some(tokens_iter.next().unwrap().to_string()),
-                    None => return Err(Error::Format),
+                    None => return Err(Error::Parser),
                 }
             }
         }

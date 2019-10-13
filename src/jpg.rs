@@ -136,7 +136,7 @@ impl Reader for JpgReader {
         // The -2 is there because otherwise the length would take into count the 0xFFE1
         let tags_bytes_length: u16 = match (tags_bytes.len() - 2).try_into() {
             Ok(v) => v,
-            Err(_) => return Err(Error::Format),
+            Err(_) => return Err(Error::Parser),
         };
         bytes[tags_start + 3] = (tags_bytes_length & 0xFF) as u8;
         bytes[tags_start + 2] = ((tags_bytes_length >> 8) & 0xFF) as u8;
@@ -165,7 +165,7 @@ impl JpgReader {
                 .red()
             );
             next!(file_iterator);
-            Err(Error::Format)
+            Err(Error::Parser)
         } else {
             debug!("Read {:#02X?}", &chunk_data[chunk_data.len() - 8..]);
             Ok(chunk_data)
