@@ -116,7 +116,7 @@ impl Reader for JpgReader {
                     break;
                 }
             }
-        } else if bytes_diff > tags_bytes.len() as isize {
+        } else {
             loop {
                 bytes.remove(tags_start);
                 bytes_diff -= 1;
@@ -220,6 +220,8 @@ impl JpgReader {
     }
     fn create_xml(tags: &TagSet) -> Vec<u8> {
         let mut tags_string = String::with_capacity(tags.len() * (8 + 10 + 9));
+        let mut tags: Vec<&String> = tags.iter().collect();
+        tags.sort_unstable();
         for tag in tags {
             tags_string.push_str(&format!("<rdf:li>{}</rdf:li>", tag))
         }
