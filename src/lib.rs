@@ -35,28 +35,27 @@ macro_rules! file_types {
 
 file_types!(png, jpg, gif);
 
+// Function exorcized by SrKomodo
 fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error> {
-    /*
-    1) This function SOMEHOW modifies the global state of the program (even though there is no such thing), therefore, it only works the first time
-    2) As it only consume the least amount of byte needed to identify the file type, sometimes (read: always) the readers receive a half consumed signature, when they actually expect the signature to be missing
-    3) `if signature[i] != byte` compares the i-nth byte of the current signature
-    4) `if signature[i] != byte` compares always the same byte with the last byte read
-    5) sigs_to_remove may not be in order, so when readers.remove(sig) is run, it may reduce the length of readers, leaving indexes in sigs_to_remove that are bigger than reader's length
-    */
     let mut readers = READERS.to_vec();
+    let mut i = 0;
     loop {
-        let mut sigs_to_remove = vec![];
         let byte = next!(bytes);
-        for (i, (signature, _)) in readers.iter().enumerate() {
-            if signature[i] != byte {
-                sigs_to_remove.push(i);
-            }
-        }
-        for sig in sigs_to_remove {
-            readers.remove(sig);
-        }
+        println!("{}", byte);
+        readers = readers
+            .iter()
+            .filter(|(signature, _)| signature[i] == byte)
+            .cloned() // Maybe there's a better way to do this
+            .collect();
+        i += 1;
         match readers.len() {
-            1 => return Ok(readers.get(0).unwrap().1),
+            1 => {
+                let (signature, reader) = readers.get(0).unwrap();
+                for _ in i..signature.len() {
+                    println!("{}", next!(bytes));
+                }
+                return Ok(*reader);
+            }
             0 => return Err(Error::Format),
             _ => (),
         };
@@ -119,6 +118,7 @@ mod tests {
     #[test]
     fn test_read_tags() {
         for path in glob("tests/**/empty.*").unwrap().map(|f| f.unwrap()) {
+            println!("{:?}", path);
             assert_eq!(read_tags(&path).unwrap(), tagset! {});
         }
         for path in glob("tests/**/untagged.*").unwrap().map(|f| f.unwrap()) {
