@@ -21,7 +21,7 @@ pub type TagSet = HashSet<String>;
 
 macro_rules! file_types {
     ($($name:ident),+) => {
-        #[derive(Copy, Clone)]
+        #[derive(Copy, Clone, Debug, PartialEq)]
         #[allow(non_camel_case_types)]
         enum FileType {
             $($name),+
@@ -90,16 +90,47 @@ pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
     Ok(())
 }
 
-#[test]
-fn test_identify_file_type() {
-    let files = vec![
-        Path::new("tests/jpg/empty.jpg"),
-        Path::new("tests/jpg/empty.png"),
-    ];
-    for path in files {
-        let file = File::open(&path).expect("Couldn't open file");
-        let mut bytes = BufReader::new(file).bytes();
-        let maybe_file_type = identify_file_type(&mut bytes);
-        maybe_file_type.expect("Error identifing filetype");
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use glob::glob;
+
+    macro_rules! file_type_tests {
+        ($($name:ident),+) => {
+            $(
+                for path in glob(concat!("tests/**/*.", stringify!($name)))
+                    .unwrap()
+                    .map(|f| f.unwrap())
+                {
+                    let file = File::open(&path).unwrap();
+                    let mut bytes = BufReader::new(file).bytes();
+                    let file_type = identify_file_type(&mut bytes).unwrap();
+                    assert_eq!(file_type, FileType::$name);
+                }
+            )+
+        };
+    }
+
+    #[test]
+    fn test_identify_file_type() {
+        file_type_tests!(png, gif, jpg);
+    }
+
+    #[test]
+    fn test_read_tags() {
+        for path in glob("tests/**/empty.*").unwrap().map(|f| f.unwrap()) {
+            assert_eq!(read_tags(&path).unwrap(), tagset! {});
+        }
+        for path in glob("tests/**/untagged.*").unwrap().map(|f| f.unwrap()) {
+            assert_eq!(read_tags(&path).unwrap(), tagset! {});
+        }
+        for path in glob("tests/**/tagged.*").unwrap().map(|f| f.unwrap()) {
+            assert_eq!(read_tags(&path).unwrap(), tagset! {"foo", "bar"});
+        }
+    }
+
+    #[test]
+    fn test_write_tags() {
+        unimplemented!();
     }
 }
