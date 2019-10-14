@@ -1,5 +1,6 @@
 // Not sure why these macros show as unused
 // probably because they are only used inside another macro
+// Weird, that doesn't happen to me, gotta love the RLS
 
 #[allow(unused_macros)]
 macro_rules! tagset {
@@ -8,6 +9,7 @@ macro_rules! tagset {
         $(m.insert($tag.to_string());)*
         m
     }};
+    {} => {TagSet::new()}
 }
 
 #[allow(unused_macros)]
@@ -36,7 +38,7 @@ macro_rules! reader_tests {
             fn test_read_empty() {
                 let mut file = open_file!(file_path!($extension, "empty"), SIGNATURE.len());
                 let result = $reader::read_tags(&mut file).unwrap();
-                assert_eq!(result, TagSet::new());
+                assert_eq!(result, tagset! {});
             }
 
             #[test]
@@ -59,7 +61,7 @@ macro_rules! reader_tests {
             #[test]
             fn test_write_tagged() {
                 let mut tagged = open_file!(file_path!($extension, "tagged"), SIGNATURE.len());
-                let result = $reader::write_tags(&mut tagged, &TagSet::new()).unwrap();
+                let result = $reader::write_tags(&mut tagged, &tagset! {}).unwrap();
                 let empty = open_file!(file_path!($extension, "untagged"), 0)
                     .map(|b| b.unwrap())
                     .collect::<Vec<u8>>();
