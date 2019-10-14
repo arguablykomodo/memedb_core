@@ -36,6 +36,13 @@ macro_rules! file_types {
 file_types!(png, jpg, gif);
 
 fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error> {
+    /*
+    1) This function SOMEHOW modifies the global state of the program (even though there is no such thing), therefore, it only works the first time
+    2) As it only consume the least amount of byte needed to identify the file type, sometimes (read: always) the readers receive a half consumed signature, when they actually expect the signature to be missing
+    3) `if signature[i] != byte` compares the i-nth byte of the current signature
+    4) `if signature[i] != byte` compares always the same byte with the last byte read
+    5) sigs_to_remove may not be in order, so when readers.remove(sig) is run, it may reduce the length of readers, leaving indexes in sigs_to_remove that are bigger than reader's length
+    */
     let mut readers = READERS.to_vec();
     loop {
         let mut sigs_to_remove = vec![];
@@ -81,4 +88,18 @@ pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
     file.write_all(&bytes)?;
 
     Ok(())
+}
+
+#[test]
+fn test_identify_file_type() {
+    let files = vec![
+        Path::new("tests/jpg/empty.jpg"),
+        Path::new("tests/jpg/empty.png"),
+    ];
+    for path in files {
+        let file = File::open(&path).expect("Couldn't open file");
+        let mut bytes = BufReader::new(file).bytes();
+        let maybe_file_type = identify_file_type(&mut bytes);
+        maybe_file_type.expect("Error identifing filetype");
+    }
 }
