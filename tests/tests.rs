@@ -12,8 +12,10 @@ macro_rules! tagset {
 
 #[test]
 fn test_read_tags() {
-    for file in glob("**/{empty|untagged}.*").unwrap().map(|f| f.unwrap()) {
-        println!("Should be empty: {:?}", file);
+    for file in glob("**/empty.*").unwrap().map(|f| f.unwrap()) {
+        assert_eq!(read_tags(&file).unwrap(), tagset! {});
+    }
+    for file in glob("**/untagged.*").unwrap().map(|f| f.unwrap()) {
         assert_eq!(read_tags(&file).unwrap(), tagset! {});
     }
     for file in glob("**/tagged.*").unwrap().map(|f| f.unwrap()) {
