@@ -118,7 +118,6 @@ mod tests {
     #[test]
     fn test_read_tags() {
         for path in glob("tests/**/empty.*").unwrap().map(|f| f.unwrap()) {
-            println!("{:?}", path);
             assert_eq!(read_tags(&path).unwrap(), tagset! {});
         }
         for path in glob("tests/**/untagged.*").unwrap().map(|f| f.unwrap()) {
