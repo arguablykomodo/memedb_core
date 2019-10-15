@@ -92,6 +92,8 @@ pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
 mod tests {
     use super::*;
     use glob::glob;
+    use std::fs::copy;
+    use std::path::PathBuf;
 
     macro_rules! file_type_tests {
         ($($name:ident),+) => {
@@ -129,6 +131,30 @@ mod tests {
 
     #[test]
     fn test_write_tags() {
-        unimplemented!();
+        let mut tmp = PathBuf::from("tmp");
+        std::fs::remove_dir_all(&tmp).unwrap();
+        std::fs::create_dir(&tmp).unwrap();
+        tmp.push("file"); // So that .set_file_name doesn't overwrite the directory name
+        for path in glob("tests/**/empty.*").unwrap().map(|f| f.unwrap()) {
+            tmp.set_file_name(path.file_name().unwrap());
+            println!("{:?} {:?}", path, tmp);
+            copy(path, &tmp).unwrap();
+            write_tags(&tmp, &tagset! {"foo", "bar"}).unwrap();
+            assert_eq!(read_tags(&tmp).unwrap(), tagset! {"foo", "bar"});
+        }
+        for path in glob("tests/**/untagged.*").unwrap().map(|f| f.unwrap()) {
+            tmp.set_file_name(path.file_name().unwrap());
+            println!("{:?} {:?}", path, tmp);
+            copy(path, &tmp).unwrap();
+            write_tags(&tmp, &tagset! {"foo", "bar"}).unwrap();
+            assert_eq!(read_tags(&tmp).unwrap(), tagset! {"foo", "bar"});
+        }
+        for path in glob("tests/**/tagged.*").unwrap().map(|f| f.unwrap()) {
+            tmp.set_file_name(path.file_name().unwrap());
+            println!("{:?} {:?}", path, tmp);
+            copy(path, &tmp).unwrap();
+            write_tags(&tmp, &tagset! {}).unwrap();
+            assert_eq!(read_tags(&tmp).unwrap(), tagset! {});
+        }
     }
 }
