@@ -41,7 +41,6 @@ fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error
     let mut i = 0;
     loop {
         let byte = next!(bytes);
-        println!("{}", byte);
         readers = readers
             .iter()
             .filter(|(signature, _)| signature[i] == byte)
@@ -52,7 +51,7 @@ fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error
             1 => {
                 let (signature, reader) = readers.get(0).unwrap();
                 for _ in i..signature.len() {
-                    println!("{}", next!(bytes));
+                    next!(bytes);
                 }
                 return Ok(*reader);
             }
