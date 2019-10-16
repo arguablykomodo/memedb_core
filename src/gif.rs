@@ -2,6 +2,7 @@
 use crate::error::Error;
 use crate::reader::{IoResult, Reader};
 use crate::TagSet;
+use log::debug;
 use std::io::Error as IoError;
 
 pub struct GifReader {}
@@ -91,6 +92,7 @@ impl GifReader {
         i += color_table_size;
 
         loop {
+            debug!("Reading block {}", bytes[i]);
             match bytes[i] {
                 // Trailer, signifies end of file
                 0x3B => return Ok((i, false)),
@@ -100,6 +102,11 @@ impl GifReader {
                     let size = bytes[i + 2] as usize;
                     let data = &bytes[i + 3..i + 3 + size];
                     i += 3 + size;
+                    debug!(
+                        "Extension block label: {}, data: {}",
+                        label,
+                        String::from_utf8_lossy(data)
+                    );
 
                     if label == 0xFF && data == b"MEMETAGS1.0" {
                         return Ok((i, true));

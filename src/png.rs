@@ -2,6 +2,7 @@ use crate::error::Error;
 use crate::reader::{IoResult, Reader};
 use crate::TagSet;
 use crc::crc32::checksum_ieee;
+use log::debug;
 use std::io;
 
 macro_rules! compose {
@@ -40,6 +41,11 @@ impl Reader for PngReader {
         loop {
             let length = compose!(bytes; iter);
             let chunk_type = &[next!(bytes), next!(bytes), next!(bytes), next!(bytes)];
+            debug!(
+                "Found chunk {:?}, length: {}",
+                String::from_utf8_lossy(chunk_type),
+                length
+            );
 
             match chunk_type {
                 b"IEND" => return Ok(TagSet::new()),
@@ -93,6 +99,12 @@ impl Reader for PngReader {
             i += 4;
             let chunk_type = &bytes[i..i + 4];
             i += 4;
+
+            debug!(
+                "Found chunk {:?}, length: {}",
+                String::from_utf8_lossy(chunk_type),
+                length
+            );
 
             match chunk_type {
                 b"meMe" => {

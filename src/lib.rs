@@ -11,6 +11,7 @@ mod reader;
 mod xml;
 
 use error::Error;
+use log::info;
 use reader::Reader;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
@@ -37,6 +38,7 @@ file_types!(png, jpg, gif);
 
 // Function exorcized by SrKomodo
 fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error> {
+    info!("Identifying file type");
     let mut readers = READERS.to_vec();
     let mut i = 0;
     loop {
@@ -50,6 +52,7 @@ fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error
         match readers.len() {
             1 => {
                 let (signature, reader) = readers.get(0).unwrap();
+                info!("Going to use reader {:?}", reader);
                 for _ in i..signature.len() {
                     next!(bytes);
                 }
