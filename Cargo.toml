@@ -6,7 +6,6 @@ edition = "2018"
 
 # Turn off logs on release builds, but enable erros,warnings,info and debug in any other case
 [dependencies]
-colored = "^1.8.0"
 log = {version="^0.4.0",features = ["max_level_debug", "release_max_level_off"] }
 crc = "1.8.1"
 custom_error = "1.7.1"

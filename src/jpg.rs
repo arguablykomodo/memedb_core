@@ -2,7 +2,6 @@ use crate::error::Error;
 use crate::reader::{IoResult, Reader};
 use crate::xml::{XmlTag, XmlTree};
 use crate::TagSet;
-use colored::*;
 use log::{debug, error, info};
 use std::collections::HashSet;
 use std::io::Error as IoError;
@@ -31,7 +30,7 @@ impl Reader for JpgReader {
                 if chunk_type == 0x00 {
                     continue;
                 } else if chunk_type == EOF_CHUNK_TYPE {
-                    debug!("{}", "EOF".green());
+                    debug!("EOF");
                     break;
                 } else if chunk_type == TAGS_CHUNK_TYPE {
                     let chunk_data = JpgReader::get_chunk_data(&mut file_iterator)?;
@@ -42,7 +41,7 @@ impl Reader for JpgReader {
                     }
 
                     if let Ok(chunk_string) = String::from_utf8(chunk_data) {
-                        info!("This is the XML found: '{}'", chunk_string.yellow());
+                        info!("This is the XML found: '{}'", chunk_string);
                         tags = JpgReader::parse_xml(&chunk_string)?;
                         break;
                     } else {
@@ -156,13 +155,9 @@ impl JpgReader {
             .collect::<Result<Vec<u8>, IoError>>()?;
         if chunk_data.len() != chunk_length {
             error!(
-                "{}",
-                format!(
-                    "Error: The data captured is shorter than expected\n{} bytes expected, got {}",
-                    chunk_length,
-                    chunk_data.len()
-                )
-                .red()
+                "Error: The data captured is shorter than expected\n{} bytes expected, got {}",
+                chunk_length,
+                chunk_data.len()
             );
             next!(file_iterator);
             Err(Error::Parser)
