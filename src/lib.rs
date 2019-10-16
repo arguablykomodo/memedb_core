@@ -132,7 +132,6 @@ mod tests {
     #[test]
     fn test_write_tags() {
         let mut tmp = PathBuf::from("tmp");
-        std::fs::remove_dir_all(&tmp).unwrap();
         std::fs::create_dir(&tmp).unwrap();
         tmp.push("file"); // So that .set_file_name doesn't overwrite the directory name
         for path in glob("tests/**/empty.*").unwrap().map(|f| f.unwrap()) {
@@ -156,5 +155,7 @@ mod tests {
             write_tags(&tmp, &tagset! {}).unwrap();
             assert_eq!(read_tags(&tmp).unwrap(), tagset! {});
         }
+        tmp.pop();
+        std::fs::remove_dir_all(&tmp).unwrap();
     }
 }
