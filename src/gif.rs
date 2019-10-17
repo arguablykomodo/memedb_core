@@ -2,7 +2,7 @@
 use crate::error::Error;
 use crate::reader::{IoResult, Reader};
 use crate::TagSet;
-use log::debug;
+use log::{debug, info};
 use std::io::Error as IoError;
 
 pub struct GifReader {}
@@ -53,11 +53,13 @@ impl Reader for GifReader {
         let (i, found) = GifReader::find_tags(&bytes[SIGNATURE.len()..])?; // Skip signature, but find tags as if it didn't existed
         let mut i = i + SIGNATURE.len(); // add SIGNATURE.len() to i, to include SIGNATURE
         if !found {
+            info!("Appending bytes at {:X}", i);
             let mut insert_bytes = b"\x21\xFF\x0BMEMETAGS1.0".to_vec();
             insert_bytes.append(&mut tag_bytes);
             bytes.splice(i..i, insert_bytes);
             Ok(bytes)
         } else {
+            info!("Inserting bytes at {:X}", i);
             let start = i;
             loop {
                 if bytes[i] == 0 {
@@ -95,7 +97,10 @@ impl GifReader {
             debug!("Reading block {}", bytes[i]);
             match bytes[i] {
                 // Trailer, signifies end of file
-                0x3B => return Ok((i, false)),
+                0x3B => {
+                    info!("Reached end and no tags in sight");
+                    return Ok((i, false));
+                }
                 // Extension block
                 0x21 => {
                     let label = bytes[i + 1];
@@ -109,6 +114,7 @@ impl GifReader {
                     );
 
                     if label == 0xFF && data == b"MEMETAGS1.0" {
+                        info!("Found tags at {:X}", i);
                         return Ok((i, true));
                     }
 

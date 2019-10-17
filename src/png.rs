@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::reader::{IoResult, Reader};
 use crate::TagSet;
 use crc::crc32::checksum_ieee;
-use log::debug;
+use log::{debug, info};
 use std::io;
 
 macro_rules! compose {
@@ -48,8 +48,12 @@ impl Reader for PngReader {
             );
 
             match chunk_type {
-                b"IEND" => return Ok(TagSet::new()),
+                b"IEND" => {
+                    info!("Reached end and no tags in sight");
+                    return Ok(TagSet::new());
+                }
                 b"meMe" => {
+                    info!("Found tags, now reading");
                     let mut tags = TagSet::new();
                     let mut tag = String::new();
                     for _ in 0..length {
@@ -108,10 +112,12 @@ impl Reader for PngReader {
 
             match chunk_type {
                 b"meMe" => {
+                    info!("Found existing tags at {:X}, going to replace", i);
                     bytes.splice(i - 8..i + (length as usize) + 4, chunk);
                     return Ok(bytes);
                 }
                 b"IEND" => {
+                    info!("didn't find tags, appending at {:X}", i);
                     bytes.splice(i - 8..i - 8, chunk);
                     return Ok(bytes);
                 }
