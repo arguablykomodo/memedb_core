@@ -2,7 +2,18 @@
 name = "memedb_core"
 version = "0.1.1"
 authors = ["SrKomodo", "PeronTheDuck"]
+description = "Rust library for reading and writing tags to media files, specifically for the use of categorizing memes."
+# documentation = "..."
+# homepage = "..."
+repository = "https://gitlab.com/memedb/memedb_core"
+readme = "README.md"
+keywords = ["meme", "db", "tags"]
+categories = ["parser-implementations", "encoding", "data-structures"]
+license = "GPL-3.0-or-later"
 edition = "2018"
+
+[badges]
+gitlab = { repository = "memedb/memedb_core" }
 
 [dependencies]
 log = { version = "^0.4.8", features = ["max_level_debug", "release_max_level_off"] }
