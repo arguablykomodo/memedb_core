@@ -69,12 +69,13 @@ fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error
 /// # Example
 /// ```
 /// # use std::path::Path;
+/// # use std::collections::HashSet;
 /// # use std::fs::{copy, remove_file};
-/// # use memedb_core::{TagSet, read_tags, Error};
+/// # use memedb_core::{read_tags, Error};
 /// #
 /// # fn main() -> Result<(), Error> {
 /// # copy("tests/png/tagged.png", "tagged_meme.png");
-/// let mut tags = TagSet::new();
+/// let mut tags = HashSet::new();
 /// tags.insert("foo".to_string());
 /// tags.insert("bar".to_string());
 ///
@@ -100,12 +101,13 @@ pub fn read_tags(path: &Path) -> Result<TagSet, Error> {
 /// # Example
 /// ```
 /// # use std::path::Path;
+/// # use std::collections::HashSet;
 /// # use std::fs::{copy, remove_file};
-/// # use memedb_core::{TagSet, write_tags, Error};
+/// # use memedb_core::{write_tags, Error};
 /// #
 /// # fn main() -> Result<(), Error> {
 /// # copy("tests/png/untagged.png", "untagged_meme.png");
-/// let mut tags = TagSet::new();
+/// let mut tags = HashSet::new();
 /// tags.insert("foo".to_string());
 /// tags.insert("bar".to_string());
 ///

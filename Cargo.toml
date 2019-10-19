@@ -3,7 +3,6 @@ name = "memedb_core"
 version = "0.1.1"
 authors = ["SrKomodo", "PeronTheDuck"]
 description = "Rust library for reading and writing tags to media files, specifically for the use of categorizing memes."
-# documentation = "..."
 # homepage = "..."
 repository = "https://gitlab.com/memedb/memedb_core"
 readme = "README.md"
