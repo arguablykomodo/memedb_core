@@ -18,7 +18,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Bytes, Read, Write};
 use std::path::Path;
 
-pub type TagSet = HashSet<String>;
+type TagSet = HashSet<String>;
 
 macro_rules! file_types {
     ($($name:ident),+) => {
@@ -64,6 +64,26 @@ fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error
     }
 }
 
+/// Reads the file at `path` and returns the tags inside it if found
+///
+/// # Example
+/// ```
+/// # use std::path::Path;
+/// # use std::fs::{copy, remove_file};
+/// # use memedb_core::{TagSet, read_tags, Error};
+/// #
+/// # fn main() -> Result<(), Error> {
+/// # copy("tests/png/tagged.png", "tagged_meme.png");
+/// let mut tags = TagSet::new();
+/// tags.insert("foo".to_string());
+/// tags.insert("bar".to_string());
+///
+/// let read_tags = read_tags(&Path::new("tagged_meme.png"))?;
+/// assert_eq!(tags, read_tags);
+/// # remove_file("tagged_meme.png");
+/// # Ok(())
+/// # }
+/// ```
 pub fn read_tags(path: &Path) -> Result<TagSet, Error> {
     let file = File::open(&path)?;
     let mut bytes = BufReader::new(file).bytes();
@@ -75,6 +95,25 @@ pub fn read_tags(path: &Path) -> Result<TagSet, Error> {
     }
 }
 
+/// Writes `tags` to the file at `path`
+///
+/// # Example
+/// ```
+/// # use std::path::Path;
+/// # use std::fs::{copy, remove_file};
+/// # use memedb_core::{TagSet, write_tags, Error};
+/// #
+/// # fn main() -> Result<(), Error> {
+/// # copy("tests/png/untagged.png", "untagged_meme.png");
+/// let mut tags = TagSet::new();
+/// tags.insert("foo".to_string());
+/// tags.insert("bar".to_string());
+///
+/// write_tags(&Path::new("untagged_meme.png"), &tags)?;
+/// # remove_file("untagged_meme.png");
+/// # Ok(())
+/// # }
+/// ```
 pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
     let file = File::open(&path)?;
     let mut bytes = BufReader::new(file).bytes();

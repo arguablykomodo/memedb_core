@@ -1,6 +1,10 @@
 /target
 **/*.rs.bk
 Cargo.lock
+
 tmp
+untagged_meme.png
+tagged_meme.png
+
 .vscode
 .directory
