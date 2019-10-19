@@ -3,14 +3,14 @@ mod helpers;
 #[macro_use]
 mod reader_tests;
 
-pub mod error;
+mod error;
 mod gif;
 mod jpg;
 mod png;
 mod reader;
 mod xml;
 
-use error::Error;
+pub use error::Error;
 use log::info;
 use reader::Reader;
 use std::collections::HashSet;
