@@ -1,6 +1,6 @@
 [package]
 name = "memedb_core"
-version = "0.1.1"
+version = "1.0.0"
 authors = ["SrKomodo", "PeronTheDuck"]
 description = "Rust library for reading and writing tags to media files, specifically for the use of categorizing memes."
 # homepage = "..."
