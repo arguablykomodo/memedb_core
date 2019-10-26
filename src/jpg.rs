@@ -26,33 +26,37 @@ impl Reader for JpgReader {
                     info!("Peeked the start of another chunk");
                     continue;
                 }
-                info!("Chunk type: {:#02X?}", chunk_type);
-                if chunk_type == 0x00 {
-                    continue;
-                } else if chunk_type == EOF_CHUNK_TYPE {
-                    debug!("EOF");
-                    break;
-                } else if chunk_type == TAGS_CHUNK_TYPE {
-                    let chunk_data = JpgReader::get_chunk_data(&mut file_iterator)?;
-
-                    // XML inside jpg always start with http
-                    if &chunk_data[0..4] != b"http" {
-                        continue;
-                    }
-
-                    if let Ok(chunk_string) = String::from_utf8(chunk_data) {
-                        info!("This is the XML found: '{}'", chunk_string);
-                        tags = JpgReader::parse_xml(&chunk_string)?;
+                match chunk_type {
+                    0x00 => continue,
+                    EOF_CHUNK_TYPE => {
+                        info!("EOF");
                         break;
-                    } else {
-                        info!("Chunk-data found couldn't be converted to string");
-                        continue;
                     }
-                } else {
-                    JpgReader::skip_chunk_data(&mut file_iterator)?;
+                    TAGS_CHUNK_TYPE => {
+                        info!("Found tag chunk");
+                        let chunk_data = JpgReader::get_chunk_data(&mut file_iterator)?;
+
+                        // XML inside jpg always start with http
+                        if &chunk_data[0..4] != b"http" {
+                            continue;
+                        }
+
+                        if let Ok(chunk_string) = String::from_utf8(chunk_data) {
+                            info!("This is the XML found: '{}'", chunk_string);
+                            tags = JpgReader::parse_xml(&chunk_string)?;
+                            break;
+                        } else {
+                            info!("Chunk-data found couldn't be converted to string");
+                            continue;
+                        }
+                    }
+                    _ => {
+                        info!("Chunk type: {:#02X?}", chunk_type);
+                        JpgReader::skip_chunk_data(&mut file_iterator)?
+                    }
                 }
             } else {
-                error!("Skipping bytes");
+                debug!("Skipping bytes");
             }
         }
         Ok(tags)
