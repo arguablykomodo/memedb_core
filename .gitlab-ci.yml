@@ -1,3 +1,7 @@
+cache:
+  paths:
+    - "target/"
+
 stages:
   - build
   - test
@@ -11,6 +15,11 @@ stable-build:
     paths:
       - "target/"
 
+stable-test:
+  stage: test
+  image: rust:latest
+  script: cargo test
+
 stable-lint:
   stage: lint
   image: rust:latest
@@ -22,12 +31,3 @@ stable-lint:
   artifacts:
     paths:
       - "target/"
-  dependencies:
-    - stable-build
-
-stable-test:
-  stage: test
-  image: rust:latest
-  script: cargo test
-  dependencies:
-    - stable-lint
