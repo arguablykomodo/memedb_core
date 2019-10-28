@@ -19,8 +19,13 @@ impl Reader for JpgReader {
         use crate::helpers::log_address::LogAddress;
         let mut file_iterator: Peekable<_> = file.log().peekable();
         let mut chunk_type: u8;
+        let mut skipping_bytes_counter: Option<u32> = None;// Instead of printing 4583456 "Error: skipping bytes" messages, we count them, and then print how many times it happened
         loop {
-            if next!(file_iterator) == 0x0FF {
+            if next!(file_iterator) == 0xFF {
+                if skipping_bytes_counter.is_some() {
+                    debug!("Skipped bytes x {}",skipping_bytes_counter.unwrap());
+                    skipping_bytes_counter = None;
+                }
                 chunk_type = next!(file_iterator);
                 if next!(file_iterator;peek) == Some(&0xFF) {
                     info!("Peeked the start of another chunk");
@@ -56,7 +61,8 @@ impl Reader for JpgReader {
                     }
                 }
             } else {
-                debug!("Skipping bytes");
+                skipping_bytes_counter = Some(skipping_bytes_counter.map_or(1, |v|v+1));
+                //debug!("Skipping bytes");
             }
         }
         Ok(tags)
@@ -65,8 +71,6 @@ impl Reader for JpgReader {
         file_iterator: &mut impl Iterator<Item = IoResult>,
         tags: &TagSet,
     ) -> Result<Vec<u8>, Error> {
-        use std::time::SystemTime;
-        let t = SystemTime::now(); // Poor's Man benchmark
         let mut bytes: Vec<u8> = SIGNATURE
             .iter()
             .copied()
@@ -143,7 +147,6 @@ impl Reader for JpgReader {
         };
         bytes[tags_start + 3] = (tags_bytes_length & 0xFF) as u8;
         bytes[tags_start + 2] = ((tags_bytes_length >> 8) & 0xFF) as u8;
-        debug!("Finished in {:?}", t.elapsed().unwrap());
 
         Ok(bytes)
     }
