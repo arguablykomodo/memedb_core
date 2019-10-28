@@ -1,6 +1,7 @@
 stages:
   - build
   - test
+  - lint
 
 stable-build:
   stage: build
