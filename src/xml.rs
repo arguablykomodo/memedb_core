@@ -1,5 +1,6 @@
 use super::Error;
 use std::collections::HashMap;
+use log::{debug, error, info};
 
 #[derive(PartialEq, Debug)]
 enum XmlTagType {
@@ -23,13 +24,15 @@ impl XmlTag {
         T: Iterator<Item = String>,
     {
         let tokens: Vec<String> = iter.take_while(|v| !v.ends_with('>')).collect();
-        let tag_type = if tokens[1].chars().nth(1).unwrap() == '/' {
+        debug!("Tokens: {:#?}",tokens);
+        let tag_type = if tokens[1].chars().nth(0).unwrap() == '/' {
             XmlTagType::Closing
-        } else if tokens.last().unwrap().chars().nth(1).unwrap() == '/' {
+        } else if tokens.last().unwrap().chars().nth(0).unwrap() == '/' {
             XmlTagType::SelfClosing
         } else {
             XmlTagType::Opening
         };
+        debug!("Tag type type: {:?}",tag_type);
         let mut xml_tag = XmlTag {
             name: tokens[1].to_string(),
             attributes: HashMap::new(),
@@ -108,10 +111,6 @@ impl XmlTree {
         let mut parent_stack: Vec<usize> = vec![];
         let mut tokens_iter: std::iter::Peekable<_> = tokens.into_iter().peekable();
         while let Some(value_peeked) = tokens_iter.peek() {
-            /* let value_peeked: &String = match tokens_iter.peek() {
-                Some(v) => v,
-                None => break,
-            }; */
             if value_peeked.starts_with('<') {
                 let tag = XmlTag::parse(&mut tokens_iter, tree.get_next_id())?;
                 match tag.tag_type {
@@ -132,6 +131,7 @@ impl XmlTree {
                     }
                     XmlTagType::Closing => {
                         if parent_stack.pop().is_none() {
+                            error!("Closing tag without opening");
                             return Err(Error::Parser);
                         }
                     }
