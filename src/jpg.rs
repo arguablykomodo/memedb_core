@@ -19,11 +19,11 @@ impl Reader for JpgReader {
         use crate::helpers::log_address::LogAddress;
         let mut file_iterator: Peekable<_> = file.log().peekable();
         let mut chunk_type: u8;
-        let mut skipping_bytes_counter: Option<u32> = None;// Instead of printing 4583456 "Error: skipping bytes" messages, we count them, and then print how many times it happened
+        let mut skipping_bytes_counter: Option<u32> = None; // Instead of printing 4583456 "Error: skipping bytes" messages, we count them, and then print how many times it happened
         loop {
             if next!(file_iterator) == 0xFF {
                 if skipping_bytes_counter.is_some() {
-                    debug!("Skipped bytes x {}",skipping_bytes_counter.unwrap());
+                    debug!("Skipped bytes x {}", skipping_bytes_counter.unwrap());
                     skipping_bytes_counter = None;
                 }
                 chunk_type = next!(file_iterator);
@@ -61,8 +61,7 @@ impl Reader for JpgReader {
                     }
                 }
             } else {
-                skipping_bytes_counter = Some(skipping_bytes_counter.map_or(1, |v|v+1));
-                //debug!("Skipping bytes");
+                skipping_bytes_counter = Some(skipping_bytes_counter.map_or(1, |v| v + 1));
             }
         }
         Ok(tags)

@@ -1,6 +1,6 @@
 use super::Error;
+use log::{debug, error};
 use std::collections::HashMap;
-use log::{debug, error, info};
 
 #[derive(PartialEq, Debug)]
 enum XmlTagType {
@@ -24,7 +24,7 @@ impl XmlTag {
         T: Iterator<Item = String>,
     {
         let tokens: Vec<String> = iter.take_while(|v| !v.ends_with('>')).collect();
-        debug!("Tokens: {:#?}",tokens);
+        debug!("Tokens: {:#?}", tokens);
         let tag_type = if tokens[1].chars().nth(0).unwrap() == '/' {
             XmlTagType::Closing
         } else if tokens.last().unwrap().chars().nth(0).unwrap() == '/' {
@@ -32,7 +32,7 @@ impl XmlTag {
         } else {
             XmlTagType::Opening
         };
-        debug!("Tag type type: {:?}",tag_type);
+        debug!("Tag type type: {:?}", tag_type);
         let mut xml_tag = XmlTag {
             name: tokens[1].to_string(),
             attributes: HashMap::new(),
