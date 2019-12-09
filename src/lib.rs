@@ -52,10 +52,12 @@ fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error
         match readers.len() {
             1 => {
                 let (signature, reader) = readers.get(0).unwrap();
-                info!("Going to use reader {:?}", reader);
-                for _ in i..signature.len() {
-                    next!(bytes);
+                for j in i..signature.len() {
+                    if signature[j] != next!(bytes) {
+                        return Err(Error::Format);
+                    }
                 }
+                info!("Going to use reader {:?}", reader);
                 return Ok(*reader);
             }
             0 => return Err(Error::Format),
