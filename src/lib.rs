@@ -87,7 +87,7 @@ fn identify_file_type(bytes: &mut Bytes<impl BufRead>) -> Result<FileType, Error
 /// # Ok(())
 /// # }
 /// ```
-pub fn read_tags(path: &Path) -> Result<TagSet, Error> {
+pub fn read_tags<T: AsRef<Path>>(path: T) -> Result<TagSet, Error> {
     let file = File::open(&path)?;
     let mut bytes = BufReader::new(file).bytes();
 
@@ -118,7 +118,7 @@ pub fn read_tags(path: &Path) -> Result<TagSet, Error> {
 /// # Ok(())
 /// # }
 /// ```
-pub fn write_tags(path: &Path, tags: &TagSet) -> Result<(), Error> {
+pub fn write_tags<T: AsRef<Path>>(path: T, tags: &TagSet) -> Result<(), Error> {
     let file = File::open(&path)?;
     let mut bytes = BufReader::new(file).bytes();
 
