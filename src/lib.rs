@@ -39,7 +39,7 @@ macro_rules! tagset {
 /// # }
 /// ```
 /// Pretty self explanatory, really.
-pub fn read_tags(src: impl std::io::Read) -> TagSet {
+pub fn read_tags(src: &impl std::io::Read) -> TagSet {
     unimplemented!()
 }
 
@@ -53,6 +53,6 @@ pub fn read_tags(src: impl std::io::Read) -> TagSet {
 /// # }
 /// ```
 /// Pretty self explanatory, really.
-pub fn write_tags(dest: impl std::io::Write, tags: &TagSet) {
+pub fn write_tags(dest: &mut impl std::io::Write, tags: &TagSet) {
     unimplemented!()
 }
