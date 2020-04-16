@@ -30,19 +30,20 @@ macro_rules! tagset {
     }};
 }
 
-/// Given a `src`, return the tags contained inside.
+/// Given a `src`, return the tags (if any) contained inside.
 /// ```no_run
 /// # use std::fs::File;
 /// # use memedb_core::{read_tags, tagset};
 /// # fn main() -> std::io::Result<()> {
-/// let tags = read_tags(&File::open("foo.png")?);
-/// assert_eq!(tags, tagset!{"bar"});
+/// let tags = read_tags(File::open("foo.png")?);
+/// assert_eq!(tags.unwrap(), Some(tagset!{"bar"}));
 /// # Ok(())
 /// # }
 /// ```
-/// Pretty self explanatory, really.
-pub fn read_tags(src: &impl std::io::Read) -> TagSet {
-    unimplemented!()
+/// In the case that the format is unrecognized, the function will return None.
+pub fn read_tags(src: impl std::io::Read) -> std::io::Result<Option<TagSet>> {
+    let mut bytes = src.bytes();
+    formats::read_tags(&mut bytes)
 }
 
 /// Write the provided `tags` to `dest`

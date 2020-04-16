@@ -32,6 +32,16 @@ fn identify_format(bytes: &mut Bytes<impl Read>) -> Result<Option<Format>> {
     }
 }
 
+pub fn read_tags(bytes: &mut Bytes<impl Read>) -> Result<Option<crate::TagSet>> {
+    Ok(if let Some(format) = identify_format(bytes)? {
+        Some(match format {
+            Format::Png => png::read_tags(bytes),
+        })
+    } else {
+        None
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
