@@ -2,7 +2,7 @@
 //!
 //! It's been mainly designed for the categorization of memes.
 
-mod handlers;
+mod formats;
 
 type TagSet = std::collections::HashSet<String>;
 

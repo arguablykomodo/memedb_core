@@ -3,23 +3,23 @@ mod png;
 use std::io::{Bytes, Read, Result};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-enum Handler {
+enum Format {
     Png,
 }
 
-const HANDLERS: &[(&[u8], Handler)] = &[(png::SIGNATURE, Handler::Png)];
+const FORMATS: &[(&[u8], Format)] = &[(png::SIGNATURE, Format::Png)];
 
 // Identifies the format for a file by succesively eliminating non-matching signatures until 1 remains.
-fn identify_format(bytes: &mut Bytes<impl Read>) -> Result<Option<Handler>> {
-    let mut handlers = HANDLERS.to_vec();
+fn identify_format(bytes: &mut Bytes<impl Read>) -> Result<Option<Format>> {
+    let mut formats = FORMATS.to_vec();
     // Get length of longest signature, so we know when to stop iterating
-    let length = HANDLERS.iter().map(|(s, _)| s.len()).max().expect("no handlers found");
+    let length = FORMATS.iter().map(|(s, _)| s.len()).max().expect("no handlers found");
     for (i, byte) in bytes.take(length).enumerate() {
         let byte = byte?;
         // Filter non-matching signatures
-        handlers = handlers.into_iter().filter(|(s, _)| s[i] == byte).collect();
-        match handlers.len() {
-            1 => return Ok(Some(handlers[0].1)),
+        formats = formats.into_iter().filter(|(s, _)| s[i] == byte).collect();
+        match formats.len() {
+            1 => return Ok(Some(formats[0].1)),
             0 => return Ok(None),
             _ => (),
         }
@@ -38,8 +38,8 @@ mod tests {
 
     #[test]
     fn correctly_identify_handlers() {
-        for handler in HANDLERS {
-            assert_eq!(identify_format(&mut handler.0.bytes()).unwrap(), Some(handler.1));
+        for format in FORMATS {
+            assert_eq!(identify_format(&mut format.0.bytes()).unwrap(), Some(format.1));
         }
     }
 
