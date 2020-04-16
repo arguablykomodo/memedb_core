@@ -2,6 +2,8 @@
 //!
 //! It's been mainly designed for the categorization of memes.
 
+mod handlers;
+
 type TagSet = std::collections::HashSet<String>;
 
 /// Utility macro for quickly creating tagsets.
