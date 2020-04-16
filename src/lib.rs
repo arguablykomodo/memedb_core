@@ -33,7 +33,7 @@ macro_rules! tagset {
 /// # use std::fs::File;
 /// # use memedb_core::{read_tags, tagset};
 /// # fn main() -> std::io::Result<()> {
-/// let tags = read_tags(File::open("foo.png")?);
+/// let tags = read_tags(&File::open("foo.png")?);
 /// assert_eq!(tags, tagset!{"bar"});
 /// # Ok(())
 /// # }
@@ -48,7 +48,7 @@ pub fn read_tags(src: &impl std::io::Read) -> TagSet {
 /// # use std::{fs::File, collections::HashSet};
 /// # use memedb_core::{write_tags, tagset};
 /// # fn main() -> std::io::Result<()> {
-/// write_tags(File::create("bar.png")?, &tagset!{"foo"});
+/// write_tags(&mut File::create("bar.png")?, &tagset!{"foo"});
 /// # Ok(())
 /// # }
 /// ```
