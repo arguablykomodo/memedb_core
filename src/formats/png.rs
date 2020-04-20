@@ -41,7 +41,6 @@ pub fn read_tags(src: &mut (impl io::Read + io::Seek)) -> Result<crate::TagSet> 
     loop {
         let chunk_length = decode_big_endian(src)?;
         let chunk_type = read_bytes!(src, 4);
-        println!("{} {:?}", chunk_length, chunk_type);
         match &chunk_type {
             b"IEND" => return Ok(tags),
             b"meMe" => {
