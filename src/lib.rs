@@ -2,7 +2,11 @@
 //!
 //! It's been mainly designed for the categorization of memes.
 
+mod error;
 mod formats;
+
+use error::Result;
+use std::io;
 
 type TagSet = std::collections::HashSet<String>;
 
@@ -23,6 +27,7 @@ type TagSet = std::collections::HashSet<String>;
 /// ```
 #[macro_export]
 macro_rules! tagset {
+    {} => { std::collections::HashSet::new() };
     {$($tag:expr),*} => {{
         let mut tagset = std::collections::HashSet::new();
         $(tagset.insert(String::from($tag));)*
@@ -35,15 +40,14 @@ macro_rules! tagset {
 /// # use std::fs::File;
 /// # use memedb_core::{read_tags, tagset};
 /// # fn main() -> std::io::Result<()> {
-/// let tags = read_tags(File::open("foo.png")?);
+/// let tags = read_tags(&mut File::open("foo.png")?);
 /// assert_eq!(tags.unwrap(), Some(tagset!{"bar"}));
 /// # Ok(())
 /// # }
 /// ```
 /// In the case that the format is unrecognized, the function will return None.
-pub fn read_tags(src: impl std::io::Read) -> std::io::Result<Option<TagSet>> {
-    let mut bytes = src.bytes();
-    formats::read_tags(&mut bytes)
+pub fn read_tags(src: &mut (impl io::Read + io::Seek)) -> Result<Option<TagSet>> {
+    formats::read_tags(src)
 }
 
 /// Write the provided `tags` to `dest`
@@ -56,6 +60,6 @@ pub fn read_tags(src: impl std::io::Read) -> std::io::Result<Option<TagSet>> {
 /// # }
 /// ```
 /// Pretty self explanatory, really.
-pub fn write_tags(dest: &mut impl std::io::Write, tags: &TagSet) {
+pub fn write_tags(dest: &mut impl io::Write, tags: &TagSet) {
     unimplemented!()
 }

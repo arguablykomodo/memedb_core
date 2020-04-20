@@ -15,3 +15,5 @@ edition = "2018"
 gitlab = { repository = "memedb/memedb_core" }
 
 [dependencies]
+thiserror = "1.0.15"
+crc = "1.8.1"
