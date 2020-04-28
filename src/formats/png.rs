@@ -81,6 +81,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
 }
 
 pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
+    dest.write_all(SIGNATURE)?;
     loop {
         let chunk_length = decode_big_endian(src)?;
         let chunk_type = read_bytes!(src, 4);
@@ -145,23 +146,43 @@ mod tests {
         };
     }
 
+    macro_rules! assert_write {
+        ($file:literal, $tags:expr, $reference:literal) => {
+            let src = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/", $file));
+            let mut src = std::io::Cursor::new(&src[..]);
+            src.set_position(SIGNATURE.len() as u64);
+
+            let mut dest = Vec::new();
+            write_tags(&mut src, &mut dest, $tags).unwrap();
+
+            let reference =
+                include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/", $reference));
+
+            assert_eq!(&dest[..], &reference[..]);
+        };
+    }
+
     #[test]
     fn normal() {
         assert_read!("normal.png", tagset! {});
+        assert_write!("normal.png", tagset! { "foo", "bar" }, "tagged.png");
     }
 
     #[test]
     fn no_tags() {
         assert_read!("no_tags.png", tagset! {});
+        assert_write!("no_tags.png", tagset! { "foo", "bar" }, "tagged.png");
     }
 
     #[test]
     fn tagged() {
         assert_read!("tagged.png", tagset! { "foo", "bar" });
+        assert_write!("tagged.png", tagset! {}, "no_tags.png");
     }
 
     #[test]
     fn multiple_chunks() {
         assert_read!("multiple_chunks.png", tagset! { "foo", "bar" });
+        assert_write!("tagged.png", tagset! { "foo", "bar" }, "tagged.png");
     }
 }
