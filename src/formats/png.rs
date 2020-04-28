@@ -1,8 +1,13 @@
-use crate::error::{Error, Result};
+use crate::{
+    error::{Error, Result},
+    TagSet,
+};
 use crc::Hasher32;
-use std::io;
+use std::io::{Read, Seek, SeekFrom, Write};
 
 pub const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+
+const MEME_CHUNK: &[u8; 4] = b"meMe";
 
 // Utility macro for easily getting bytes from a stream
 macro_rules! read_bytes {
@@ -20,8 +25,13 @@ macro_rules! read_bytes {
     }};
 }
 
+// Encodes a 4 bit big endian number.
+fn encode_big_endian(n: u32) -> [u8; 4] {
+    [(n >> 24 & 0xFF) as u8, (n >> 16 & 0xFF) as u8, (n >> 8 & 0xFF) as u8, (n & 0xFF) as u8]
+}
+
 // Decodes a 4 bit big endian number.
-fn decode_big_endian(src: &mut impl io::Read) -> Result<u32> {
+fn decode_big_endian(src: &mut impl Read) -> Result<u32> {
     Ok(read_bytes!(src, 4).iter().fold(0, |acc, n| (acc << 8) + *n as u32))
 }
 
@@ -36,14 +46,14 @@ fn decode_big_endian(src: &mut impl io::Read) -> Result<u32> {
 // http://www.libpng.org/pub/png/apps/pngcheck.html
 // https://en.wikipedia.org/wiki/Portable_Network_Graphics
 
-pub fn read_tags(src: &mut (impl io::Read + io::Seek)) -> Result<crate::TagSet> {
+pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
     let mut tags = crate::TagSet::new();
     loop {
         let chunk_length = decode_big_endian(src)?;
         let chunk_type = read_bytes!(src, 4);
         match &chunk_type {
             b"IEND" => return Ok(tags),
-            b"meMe" => {
+            MEME_CHUNK => {
                 let bytes = read_bytes!(src, chunk_length as usize);
                 let checksum = decode_big_endian(src)?;
                 let mut digest = crc::crc32::Digest::new(crc::crc32::IEEE);
@@ -64,7 +74,58 @@ pub fn read_tags(src: &mut (impl io::Read + io::Seek)) -> Result<crate::TagSet> 
             }
             _ => {
                 // Skip unknown chunks
-                src.seek(io::SeekFrom::Current(chunk_length as i64 + 4))?;
+                src.seek(SeekFrom::Current(chunk_length as i64 + 4))?;
+            }
+        }
+    }
+}
+
+pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
+    loop {
+        let chunk_length = decode_big_endian(src)?;
+        let chunk_type = read_bytes!(src, 4);
+        match &chunk_type {
+            b"IEND" => {
+                let mut tags: Vec<_> = tags.into_iter().collect();
+                tags.sort_unstable();
+                let tags: Vec<_> =
+                    tags.into_iter().map(|t| (t + ";").into_bytes()).flatten().collect();
+
+                if tags.len() as u64 >= std::u32::MAX as u64 {
+                    return Err(Error::PngOverflow);
+                }
+
+                let checksum = {
+                    let mut digest = crc::crc32::Digest::new(crc::crc32::IEEE);
+                    digest.write(MEME_CHUNK);
+                    digest.write(&tags);
+                    digest.sum32()
+                };
+
+                let mut buffer = Vec::new();
+                buffer.extend(&encode_big_endian(tags.len() as u32));
+                buffer.extend(MEME_CHUNK);
+                buffer.extend(tags);
+                buffer.extend(&encode_big_endian(checksum));
+
+                dest.write_all(&buffer)?;
+
+                // Write rest of the file
+                dest.write_all(&encode_big_endian(chunk_length))?;
+                dest.write_all(&chunk_type)?;
+                dest.write_all(&read_bytes!(src, chunk_length as usize + 4))?;
+
+                return Ok(());
+            }
+            MEME_CHUNK => {
+                // Skip existing meme chunks
+                src.seek(SeekFrom::Current(chunk_length as i64 + 4))?;
+            }
+            _ => {
+                // Write unrelated chunks unchanged
+                dest.write_all(&encode_big_endian(chunk_length))?;
+                dest.write_all(&chunk_type)?;
+                dest.write_all(&read_bytes!(src, chunk_length as usize + 4))?;
             }
         }
     }
@@ -75,7 +136,7 @@ mod tests {
     use super::*;
     use crate::tagset;
 
-    macro_rules! assert_tags {
+    macro_rules! assert_read {
         ($file:literal, $tags:expr) => {
             let bytes = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/", $file));
             let mut cursor = std::io::Cursor::new(&bytes[..]);
@@ -86,21 +147,21 @@ mod tests {
 
     #[test]
     fn normal() {
-        assert_tags!("normal.png", tagset! {});
+        assert_read!("normal.png", tagset! {});
     }
 
     #[test]
     fn no_tags() {
-        assert_tags!("no_tags.png", tagset! {});
+        assert_read!("no_tags.png", tagset! {});
     }
 
     #[test]
     fn tagged() {
-        assert_tags!("tagged.png", tagset! { "foo", "bar" });
+        assert_read!("tagged.png", tagset! { "foo", "bar" });
     }
 
     #[test]
     fn multiple_chunks() {
-        assert_tags!("multiple_chunks.png", tagset! { "foo", "bar" });
+        assert_read!("multiple_chunks.png", tagset! { "foo", "bar" });
     }
 }

@@ -1,7 +1,7 @@
 mod png;
 
-use crate::error::Result;
-use std::io;
+use crate::{error::Result, TagSet};
+use std::io::{Read, Seek, Write};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum Format {
@@ -11,7 +11,7 @@ enum Format {
 const FORMATS: &[(&[u8], Format)] = &[(png::SIGNATURE, Format::Png)];
 
 // Identifies the format for a file by succesively eliminating non-matching signatures until 1 remains.
-fn identify_format(src: &mut impl io::Read) -> Result<Option<Format>> {
+fn identify_format(src: &mut impl Read) -> Result<Option<Format>> {
     let mut formats = FORMATS.to_vec();
 
     // Get length of longest signature, so we know when to stop iterating
@@ -30,10 +30,24 @@ fn identify_format(src: &mut impl io::Read) -> Result<Option<Format>> {
     unreachable!()
 }
 
-pub fn read_tags(bytes: &mut (impl io::Read + io::Seek)) -> Result<Option<crate::TagSet>> {
-    Ok(if let Some(format) = identify_format(bytes)? {
+pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>> {
+    Ok(if let Some(format) = identify_format(src)? {
         Some(match format {
-            Format::Png => png::read_tags(bytes)?,
+            Format::Png => png::read_tags(src)?,
+        })
+    } else {
+        None
+    })
+}
+
+pub fn write_tags(
+    src: &mut (impl Read + Seek),
+    dest: &mut impl Write,
+    tags: TagSet,
+) -> Result<Option<()>> {
+    Ok(if let Some(format) = identify_format(src)? {
+        Some(match format {
+            Format::Png => png::write_tags(src, dest, tags)?,
         })
     } else {
         None

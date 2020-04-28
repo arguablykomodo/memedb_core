@@ -8,6 +8,8 @@ pub enum Error {
     Utf8(#[from] std::str::Utf8Error),
     #[error("Corrupted tags in PNG data")]
     PngChecksum,
+    #[error("Size of tags overflows maximum chunk size")]
+    PngOverflow,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
