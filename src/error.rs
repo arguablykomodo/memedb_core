@@ -10,6 +10,10 @@ pub enum Error {
     PngChecksum,
     #[error("Size of tags overflows maximum chunk size")]
     PngOverflow,
+    #[error("Unknown GIF extension block found, expected one of 0xFF, 0xFE, 0xF9, or 0x01, but found {0}")]
+    GifUnknownExtension(u8),
+    #[error("Unknown GIF block found, expected one of 0x21, 0x2C, or 0x3B, but found {0}")]
+    GifUnknownBlock(u8),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

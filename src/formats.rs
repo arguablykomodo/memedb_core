@@ -7,9 +7,10 @@ use std::io::{Read, Seek, Write};
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum Format {
     Png,
+    Gif,
 }
 
-const FORMATS: &[(&[u8], Format)] = &[(png::SIGNATURE, Format::Png)];
+const FORMATS: &[(&[u8], Format)] = &[(png::SIGNATURE, Format::Png), (gif::SIGNATURE, Format::Gif)];
 
 // Identifies the format for a file by succesively eliminating non-matching signatures until 1 remains.
 fn identify_format(src: &mut impl Read) -> Result<Option<Format>> {
@@ -34,6 +35,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>> {
     Ok(if let Some(format) = identify_format(src)? {
         Some(match format {
             Format::Png => png::read_tags(src)?,
+            Format::Gif => gif::read_tags(src)?,
         })
     } else {
         None
@@ -48,6 +50,7 @@ pub fn write_tags(
     Ok(if let Some(format) = identify_format(src)? {
         Some(match format {
             Format::Png => png::write_tags(src, dest, tags)?,
+            Format::Gif => gif::write_tags(src, dest, tags)?,
         })
     } else {
         None
