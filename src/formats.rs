@@ -1,3 +1,4 @@
+mod gif;
 mod png;
 
 use crate::{error::Result, TagSet};
@@ -16,11 +17,10 @@ fn identify_format(src: &mut impl Read) -> Result<Option<Format>> {
 
     // Get length of longest signature, so we know when to stop iterating
     let length = FORMATS.iter().map(|(s, _)| s.len()).max().expect("no handlers found");
-    let mut buffer = [0]; // THIS IS STUPID
     for i in 0..length {
-        src.read_exact(&mut buffer)?;
+        let byte = read_bytes!(src, 1);
         // Filter non-matching signatures
-        formats = formats.into_iter().filter(|(s, _)| s[i] == buffer[0]).collect();
+        formats = formats.into_iter().filter(|(s, _)| s[i] == byte).collect();
         match formats.len() {
             1 => return Ok(Some(formats[0].1)),
             0 => return Ok(None),

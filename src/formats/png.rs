@@ -3,27 +3,11 @@ use crate::{
     TagSet,
 };
 use crc::Hasher32;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, Write};
 
 pub const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
 const MEME_CHUNK: &[u8; 4] = b"meMe";
-
-// Utility macro for easily getting bytes from a stream
-macro_rules! read_bytes {
-    // Use the stack if the length is known at compile-time
-    ($src:expr, $n:literal) => {{
-        let mut bytes = [0; $n];
-        $src.read_exact(&mut bytes)?;
-        bytes
-    }};
-    // Use the heap otherwise
-    ($src:expr, $n:expr) => {{
-        let mut bytes = vec![0; $n];
-        $src.read_exact(&mut bytes)?;
-        bytes
-    }};
-}
 
 // Encodes a 4 bit big endian number.
 fn encode_big_endian(n: u32) -> [u8; 4] {
@@ -52,9 +36,13 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
         let chunk_length = decode_big_endian(src)?;
         let chunk_type = read_bytes!(src, 4);
         match &chunk_type {
+            // EOF
             b"IEND" => return Ok(tags),
+            // Found our tags!
             MEME_CHUNK => {
                 let bytes = read_bytes!(src, chunk_length as usize);
+
+                // Verify checksum
                 let checksum = decode_big_endian(src)?;
                 let mut digest = crc::crc32::Digest::new(crc::crc32::IEEE);
                 digest.write(&chunk_type);
@@ -62,6 +50,8 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
                 if checksum != digest.sum32() {
                     return Err(Error::PngChecksum);
                 }
+
+                // Collect tags, split at semicolons
                 let mut tag = String::new();
                 for byte in bytes {
                     match byte {
@@ -72,9 +62,9 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
                     }
                 }
             }
+            // We dont care about these, skip!
             _ => {
-                // Skip unknown chunks
-                src.seek(SeekFrom::Current(chunk_length as i64 + 4))?;
+                skip_bytes!(src, chunk_length as i64 + 4)?;
             }
         }
     }
@@ -86,16 +76,20 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
         let chunk_length = decode_big_endian(src)?;
         let chunk_type = read_bytes!(src, 4);
         match &chunk_type {
+            // EOF
             b"IEND" => {
+                // Encode tags
                 let mut tags: Vec<_> = tags.into_iter().collect();
                 tags.sort_unstable();
                 let tags: Vec<_> =
                     tags.into_iter().map(|t| (t + ";").into_bytes()).flatten().collect();
 
+                // If this error is returned, someone has *way* too many tags
                 if tags.len() as u64 >= std::u32::MAX as u64 {
                     return Err(Error::PngOverflow);
                 }
 
+                // Compute checksum
                 let checksum = {
                     let mut digest = crc::crc32::Digest::new(crc::crc32::IEEE);
                     digest.write(MEME_CHUNK);
@@ -103,12 +97,12 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
                     digest.sum32()
                 };
 
+                // Write it all
                 let mut buffer = Vec::new();
                 buffer.extend(&encode_big_endian(tags.len() as u32));
                 buffer.extend(MEME_CHUNK);
                 buffer.extend(tags);
                 buffer.extend(&encode_big_endian(checksum));
-
                 dest.write_all(&buffer)?;
 
                 // Write rest of the file
@@ -118,12 +112,12 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
 
                 return Ok(());
             }
+            // Old tags, skip!
             MEME_CHUNK => {
-                // Skip existing meme chunks
-                src.seek(SeekFrom::Current(chunk_length as i64 + 4))?;
+                skip_bytes!(src, chunk_length as i64 + 4)?;
             }
+            // Leave unrelated chunks unchanged
             _ => {
-                // Write unrelated chunks unchanged
                 dest.write_all(&encode_big_endian(chunk_length))?;
                 dest.write_all(&chunk_type)?;
                 dest.write_all(&read_bytes!(src, chunk_length as usize + 4))?;

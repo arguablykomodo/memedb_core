@@ -2,6 +2,9 @@
 //!
 //! It's been mainly designed for the categorization of memes.
 
+#[macro_use]
+mod utils;
+
 mod error;
 mod formats;
 
