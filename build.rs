@@ -14,6 +14,11 @@ fn main() {
         println!("cargo:rerun-if-changed={}", path.display());
 
         let module = path.file_stem().unwrap().to_str().unwrap();
+
+        if var_os(format!("CARGO_FEATURE_{}", module.to_uppercase())).is_none() {
+            continue;
+        }
+
         let upper = {
             let mut c = module.chars();
             match c.next() {
