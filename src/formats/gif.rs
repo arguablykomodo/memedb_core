@@ -65,7 +65,7 @@ fn get_color_table_size(byte: u8) -> u16 {
     let has_global_color_table = byte & 0b10000000;
     if has_global_color_table >> 7 == 1 {
         let packed_size = byte & 0b00000111;
-        2u16.pow(packed_size as u32 + 1)
+        3 * 2u16.pow(packed_size as u32 + 1)
     } else {
         0
     }
