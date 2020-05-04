@@ -1,16 +1,20 @@
 stages:
   - build
 
-rust-latest:
+lint:
+  stage: build
+  image: rust:latest
+  before_script: rustup component add clippy
+  script: cargo clippy --all-targets --all-features -- -D warnings
+
+stable:
   stage: build
   image: rust:latest
   script:
     - cargo build -vv
     - cargo test -vv
-    - rustup component add clippy
-    - cargo clippy -vv --all-targets --all-features -- -D warnings
 
-rust-nightly:
+nightly:
   stage: build
   image: rustlang/rust:nightly
   script:
