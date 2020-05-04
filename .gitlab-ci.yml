@@ -1,33 +1,19 @@
-cache:
-  paths:
-    - "target/"
-
 stages:
   - build
-  - test
-  - lint
 
-stable-build:
+rust-latest:
   stage: build
   image: rust:latest
-  script: cargo build
-  artifacts:
-    paths:
-      - "target/"
-
-stable-test:
-  stage: test
-  image: rust:latest
-  script: cargo test
-
-stable-lint:
-  stage: lint
-  image: rust:latest
   script:
-    - rustup component add rustfmt
-    - cargo fmt -- --check
+    - cargo build -vv
+    - cargo test -vv
     - rustup component add clippy
-    - cargo clippy
-  artifacts:
-    paths:
-      - "target/"
+    - cargo clippy -vv --all-targets --all-features -- -D warnings
+
+rust-nightly:
+  stage: build
+  image: rustlang/rust:nightly
+  script:
+    - cargo build -vv
+    - cargo test -vv
+  allow_failure: true
