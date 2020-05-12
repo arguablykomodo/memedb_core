@@ -71,59 +71,82 @@ fn get_color_table_size(byte: u8) -> u16 {
     }
 }
 
+enum Section {
+    Tags(u8, u8, u8, [u8; 11]),
+    Application(u8, u8, u8, [u8; 11]),
+    Comment(u8, u8),
+    GraphicsControl(u8, u8),
+    Plaintext(u8, u8),
+    ImageDescriptor(u8),
+    EOF(u8),
+}
+use Section::*;
+
+fn get_section(src: &mut (impl Read + Seek)) -> Result<Section> {
+    let identifier = read_bytes!(src, 1);
+    Ok(match identifier {
+        // Extension
+        0x21 => {
+            let extension_type = read_bytes!(src, 1);
+            match extension_type {
+                // Application Extension
+                0xFF => {
+                    let block_size = read_bytes!(src, 1); // Should always be 11
+                    if block_size != 11 {
+                        return Err(Error::GifWrongApplicationIdentifierLen(block_size));
+                    }
+                    let application_identifier = read_bytes!(src, 11);
+                    if &application_identifier == IDENTIFIER {
+                        Tags(identifier, extension_type, block_size, application_identifier)
+                    } else {
+                        Application(identifier, extension_type, block_size, application_identifier)
+                    }
+                }
+                0xFE => Comment(identifier, extension_type),
+                0xF9 => GraphicsControl(identifier, extension_type),
+                0x01 => Plaintext(identifier, extension_type),
+                byte => return Err(Error::GifUnknownExtension(byte)),
+            }
+        }
+        0x2C => ImageDescriptor(identifier),
+        0x3B => EOF(identifier),
+        byte => return Err(Error::GifUnknownBlock(byte)),
+    })
+}
+
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
     let logical_screen_descriptor = read_bytes!(src, 7);
     let color_table_size = get_color_table_size(logical_screen_descriptor[4]);
     skip_bytes!(src, color_table_size as i64)?;
 
     loop {
-        let identifier = read_bytes!(src, 1);
-        match identifier {
-            // Extension
-            0x21 => {
-                let extension_type = read_bytes!(src, 1);
-                match extension_type {
-                    // Application Extension
-                    0xFF => {
-                        let block_size = read_bytes!(src, 1); // Should always be 11
-                        let application_identifier = read_bytes!(src, block_size as usize);
-                        if application_identifier == IDENTIFIER {
-                            let mut tags = TagSet::new();
-                            loop {
-                                let tag_length = read_bytes!(src, 1);
-                                if tag_length == 0 {
-                                    return Ok(tags);
-                                } else {
-                                    let tag_bytes = read_bytes!(src, tag_length as usize);
-                                    tags.insert(std::str::from_utf8(&tag_bytes)?.to_string());
-                                }
-                            }
-                        } else {
-                            skip_sub_blocks(src)?;
-                        }
+        match get_section(src)? {
+            Tags(_, _, _, _) => {
+                let mut tags = TagSet::new();
+                loop {
+                    let tag_length = read_bytes!(src, 1);
+                    if tag_length == 0 {
+                        return Ok(tags);
+                    } else {
+                        let tag_bytes = read_bytes!(src, tag_length as usize);
+                        tags.insert(std::str::from_utf8(&tag_bytes)?.to_string());
                     }
-                    // Comment Extension
-                    0xFE => skip_sub_blocks(src)?,
-                    // Graphics Control Extension and Plaintext Extension
-                    0xF9 | 0x01 => {
-                        let block_size = read_bytes!(src, 1);
-                        skip_bytes!(src, block_size as i64)?;
-                        skip_sub_blocks(src)?;
-                    }
-                    byte => return Err(Error::GifUnknownExtension(byte)),
                 }
             }
-            // Image descriptor
-            0x2C => {
+            Application(_, _, _, _) | Comment(_, _) => skip_sub_blocks(src)?,
+            GraphicsControl(_, _) | Plaintext(_, _) => {
+                let block_size = read_bytes!(src, 1);
+                skip_bytes!(src, block_size as i64)?;
+                skip_sub_blocks(src)?
+            }
+            ImageDescriptor(_) => {
                 let data = read_bytes!(src, 9);
                 let color_table_size = get_color_table_size(data[8]);
                 // Extra byte skipped is LZW Minimum Code Size, i dont know what it is and i dont care
                 skip_bytes!(src, color_table_size as i64 + 1)?;
                 skip_sub_blocks(src)?;
             }
-            // EOF
-            0x3B => return Ok(TagSet::new()),
-            byte => return Err(Error::GifUnknownBlock(byte)),
+            EOF(_) => return Ok(TagSet::new()),
         }
     }
 }
@@ -137,43 +160,25 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
     dest.write_all(&read_bytes!(src, color_table_size as usize)[..])?;
 
     loop {
-        let identifier = read_bytes!(src, 1);
-        match identifier {
-            // Extension
-            0x21 => {
-                let extension_type = read_bytes!(src, 1);
-                match extension_type {
-                    // Application Extension
-                    0xFF => {
-                        let block_size = read_bytes!(src, 1); // Should always be 11
-                        let application_identifier = read_bytes!(src, block_size as usize);
-                        if application_identifier == IDENTIFIER {
-                            skip_sub_blocks(src)?;
-                        } else {
-                            dest.write_all(&[identifier, extension_type])?;
-                            dest.write_all(&[block_size])?;
-                            dest.write_all(&application_identifier[..])?;
-                            write_sub_blocks(src, dest)?;
-                        }
-                    }
-                    // Comment Extension
-                    0xFE => {
-                        dest.write_all(&[identifier, extension_type])?;
-                        write_sub_blocks(src, dest)?;
-                    }
-                    // Graphics Control Extension and Plaintext Extension
-                    0xF9 | 0x01 => {
-                        dest.write_all(&[identifier, extension_type])?;
-                        let block_size = read_bytes!(src, 1);
-                        dest.write_all(&[block_size])?;
-                        dest.write_all(&read_bytes!(src, block_size as usize)[..])?;
-                        write_sub_blocks(src, dest)?;
-                    }
-                    byte => return Err(Error::GifUnknownExtension(byte)),
-                }
+        match get_section(src)? {
+            Tags(_, _, _, _) => skip_sub_blocks(src)?,
+            Application(identifier, extension_type, block_size, application_identifier) => {
+                dest.write_all(&[identifier, extension_type, block_size])?;
+                dest.write_all(&application_identifier[..])?;
+                write_sub_blocks(src, dest)?;
             }
-            // Image descriptor
-            0x2C => {
+            Comment(identifier, extension_type) => {
+                dest.write_all(&[identifier, extension_type])?;
+                write_sub_blocks(src, dest)?;
+            }
+            GraphicsControl(identifier, extension_type) | Plaintext(identifier, extension_type) => {
+                dest.write_all(&[identifier, extension_type])?;
+                let block_size = read_bytes!(src, 1);
+                dest.write_all(&[block_size])?;
+                dest.write_all(&read_bytes!(src, block_size as usize)[..])?;
+                write_sub_blocks(src, dest)?;
+            }
+            ImageDescriptor(identifier) => {
                 dest.write_all(&[identifier])?;
                 let data = read_bytes!(src, 9);
                 dest.write_all(&data)?;
@@ -182,8 +187,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
                 dest.write_all(&read_bytes!(src, color_table_size as usize + 1)[..])?;
                 write_sub_blocks(src, dest)?;
             }
-            // EOF
-            0x3B => {
+            EOF(identifier) => {
                 dest.write_all(&[0x21, 0xFF, 0x0B])?;
                 dest.write_all(IDENTIFIER)?;
 
@@ -200,7 +204,6 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
                 dest.write_all(&[identifier])?;
                 return Ok(());
             }
-            byte => return Err(Error::GifUnknownBlock(byte)),
         }
     }
 }
