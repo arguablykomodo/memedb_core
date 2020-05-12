@@ -7,7 +7,8 @@ use std::io::{Read, Seek, Write};
 
 pub const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
-const MEME_CHUNK: &[u8; 4] = b"meMe";
+const TAG_CHUNK: &[u8; 4] = b"meMe";
+const END_CHUNK: &[u8; 4] = b"IEND";
 
 // Encodes a 4 bit big endian number.
 fn encode_big_endian(n: u32) -> [u8; 4] {
@@ -36,10 +37,8 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
         let chunk_length = decode_big_endian(src)?;
         let chunk_type = read_bytes!(src, 4);
         match &chunk_type {
-            // EOF
-            b"IEND" => return Ok(tags),
-            // Found our tags!
-            MEME_CHUNK => {
+            END_CHUNK => return Ok(tags),
+            TAG_CHUNK => {
                 let bytes = read_bytes!(src, chunk_length as usize);
 
                 // Verify checksum
@@ -76,8 +75,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
         let chunk_length = decode_big_endian(src)?;
         let chunk_type = read_bytes!(src, 4);
         match &chunk_type {
-            // EOF
-            b"IEND" => {
+            END_CHUNK => {
                 // Encode tags
                 let mut tags: Vec<_> = tags.into_iter().collect();
                 tags.sort_unstable();
@@ -92,7 +90,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
                 // Compute checksum
                 let checksum = {
                     let mut digest = crc::crc32::Digest::new(crc::crc32::IEEE);
-                    digest.write(MEME_CHUNK);
+                    digest.write(TAG_CHUNK);
                     digest.write(&tags);
                     digest.sum32()
                 };
@@ -100,7 +98,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
                 // Write it all
                 let mut buffer = Vec::new();
                 buffer.extend(&encode_big_endian(tags.len() as u32));
-                buffer.extend(MEME_CHUNK);
+                buffer.extend(TAG_CHUNK);
                 buffer.extend(tags);
                 buffer.extend(&encode_big_endian(checksum));
                 dest.write_all(&buffer)?;
@@ -112,8 +110,8 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
 
                 return Ok(());
             }
-            // Old tags, skip!
-            MEME_CHUNK => {
+            // Skip old tags
+            TAG_CHUNK => {
                 skip_bytes!(src, chunk_length as i64 + 4)?;
             }
             // Leave unrelated chunks unchanged
