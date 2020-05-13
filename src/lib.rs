@@ -2,6 +2,9 @@
 //!
 //! It's been mainly designed for the categorization of memes.
 
+#[cfg(not(any(feature = "png", feature = "gif")))]
+compile_error!("At least one format feature must be enabled for this crate to be usable.");
+
 #[macro_use]
 mod utils;
 

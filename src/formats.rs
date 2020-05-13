@@ -1,46 +1,57 @@
+#[cfg(feature = "gif")]
+mod gif;
+#[cfg(feature = "png")]
+mod png;
+
 use crate::{error::Result, TagSet};
 use std::io::{Read, Seek, Write};
 
-macro_rules! generate_formats {
-    {$($module:ident => $variant:ident),*} => {
-        $(mod $module;)*
-
-        #[derive(Copy, Clone, Debug, PartialEq)]
-        enum Format {
-            $($variant,)*
-        }
-
-        const FORMATS: &[(&[u8], Format)] = &[
-            $(($module::SIGNATURE, Format::$variant),)*
-        ];
-
-        pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>> {
-            if let Some(format) = identify_format(src)? {
-                Ok(Some(match format {
-                    $(Format::$variant => $module::read_tags(src)?,)*
-                }))
-            } else {
-                Ok(None)
-            }
-        }
-
-        pub fn write_tags(
-            src: &mut (impl Read + Seek),
-            dest: &mut impl Write,
-            tags: TagSet,
-        ) -> Result<Option<()>> {
-            if let Some(format) = identify_format(src)? {
-                Ok(Some(match format {
-                    $(Format::$variant => $module::write_tags(src, dest, tags)?,)*
-                }))
-            } else {
-                Ok(None)
-            }
-        }
-    };
+#[derive(Copy, Clone, Debug, PartialEq)]
+enum Format {
+    #[cfg(feature = "gif")]
+    Gif,
+    #[cfg(feature = "png")]
+    Png,
 }
 
-include!(concat!(env!("OUT_DIR"), "/format_macro.rs"));
+const FORMATS: &[(&[u8], Format)] = &[
+    #[cfg(feature = "gif")]
+    (gif::SIGNATURE, Format::Gif),
+    #[cfg(feature = "png")]
+    (png::SIGNATURE, Format::Png),
+];
+
+pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>> {
+    if let Some(format) = identify_format(src)? {
+        let tags = match format {
+            #[cfg(feature = "gif")]
+            Format::Gif => gif::read_tags(src)?,
+            #[cfg(feature = "png")]
+            Format::Png => png::read_tags(src)?,
+        };
+        Ok(Some(tags))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn write_tags(
+    src: &mut (impl Read + Seek),
+    dest: &mut impl Write,
+    tags: TagSet,
+) -> Result<Option<()>> {
+    if let Some(format) = identify_format(src)? {
+        match format {
+            #[cfg(feature = "gif")]
+            Format::Gif => gif::write_tags(src, dest, tags)?,
+            #[cfg(feature = "png")]
+            Format::Png => png::write_tags(src, dest, tags)?,
+        };
+        Ok(Some(()))
+    } else {
+        Ok(None)
+    }
+}
 
 // Identifies the format for a file by succesively eliminating non-matching signatures until 1 remains.
 fn identify_format(src: &mut impl Read) -> Result<Option<Format>> {
