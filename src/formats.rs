@@ -21,6 +21,25 @@ const FORMATS: &[(&[u8], Format)] = &[
     (png::SIGNATURE, Format::Png),
 ];
 
+// Identifies the format for a file by succesively eliminating non-matching signatures until 1 remains.
+fn identify_format(src: &mut impl Read) -> Result<Option<Format>> {
+    let mut formats = FORMATS.to_vec();
+
+    // Get length of longest signature, so we know when to stop iterating
+    let length = FORMATS.iter().map(|(s, _)| s.len()).max().expect("no handlers found");
+    for i in 0..length {
+        let byte = read_bytes!(src, 1);
+        // Filter non-matching signatures
+        formats = formats.into_iter().filter(|(s, _)| s[i] == byte).collect();
+        match formats.len() {
+            1 => return Ok(Some(formats[0].1)),
+            0 => return Ok(None),
+            _ => (),
+        }
+    }
+    unreachable!()
+}
+
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>> {
     if let Some(format) = identify_format(src)? {
         let tags = match format {
@@ -51,25 +70,6 @@ pub fn write_tags(
     } else {
         Ok(None)
     }
-}
-
-// Identifies the format for a file by succesively eliminating non-matching signatures until 1 remains.
-fn identify_format(src: &mut impl Read) -> Result<Option<Format>> {
-    let mut formats = FORMATS.to_vec();
-
-    // Get length of longest signature, so we know when to stop iterating
-    let length = FORMATS.iter().map(|(s, _)| s.len()).max().expect("no handlers found");
-    for i in 0..length {
-        let byte = read_bytes!(src, 1);
-        // Filter non-matching signatures
-        formats = formats.into_iter().filter(|(s, _)| s[i] == byte).collect();
-        match formats.len() {
-            1 => return Ok(Some(formats[0].1)),
-            0 => return Ok(None),
-            _ => (),
-        }
-    }
-    unreachable!()
 }
 
 #[cfg(test)]
