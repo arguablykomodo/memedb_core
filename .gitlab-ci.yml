@@ -1,13 +1,7 @@
 stages:
   - build
-
-lint:
-  stage: build
-  image: rust:latest
-  before_script:
-    - rustup component add clippy
-  script:
-    - cargo clippy --all-targets --all-features -- -D warnings
+  - lint
+  - bench
 
 stable:
   stage: build
@@ -23,3 +17,17 @@ nightly:
     - cargo build -vv
     - cargo test -vv
   allow_failure: true
+
+lint:
+  stage: lint
+  image: rust:latest
+  before_script:
+    - rustup component add clippy
+  script:
+    - cargo clippy --all-targets --all-features -- -D warnings
+
+bench:
+  stage: bench
+  image: rust:latest
+  script:
+    - cargo bench 
