@@ -28,7 +28,7 @@ macro_rules! skip_bytes {
 #[cfg(test)]
 macro_rules! assert_read {
     ($file:literal, $tags:expr) => {
-        let bytes = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/", $file));
+        let bytes = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/images/", $file));
         let mut cursor = std::io::Cursor::new(&bytes[..]);
         cursor.set_position(SIGNATURE.len() as u64);
         assert_eq!(read_tags(&mut cursor).unwrap(), $tags);
@@ -38,14 +38,15 @@ macro_rules! assert_read {
 #[cfg(test)]
 macro_rules! assert_write {
     ($file:literal, $tags:expr, $reference:literal) => {
-        let src = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/", $file));
+        let src = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/images/", $file));
         let mut src = std::io::Cursor::new(&src[..]);
         src.set_position(SIGNATURE.len() as u64);
 
         let mut dest = Vec::new();
         write_tags(&mut src, &mut dest, $tags).unwrap();
 
-        let reference = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/", $reference));
+        let reference =
+            include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/images/", $reference));
 
         assert_eq!(&dest[..], &reference[..]);
     };
