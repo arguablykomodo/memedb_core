@@ -35,7 +35,7 @@ fn identify_format(src: &mut impl Read) -> Result<Option<Format>> {
             1 => {
                 let format = formats[0];
                 // Verify the rest of the signature
-                if &read_bytes!(src, format.0.len() - i - 1)[..] == &format.0[i + 1..] {
+                if read_bytes!(src, format.0.len() - i - 1)[..] == format.0[i + 1..] {
                     return Ok(Some(format.1));
                 }
             }
