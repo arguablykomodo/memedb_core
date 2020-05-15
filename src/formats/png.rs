@@ -152,4 +152,9 @@ mod tests {
         assert_read!("multiple_chunks.png", tagset! { "foo", "bar" });
         assert_write!("tagged.png", tagset! { "foo", "bar" }, "tagged.png");
     }
+
+    #[test]
+    fn when_you() {
+        assert_read!("when_you.png", tagset! {});
+    }
 }

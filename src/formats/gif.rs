@@ -230,4 +230,9 @@ mod tests {
         assert_read!("tagged.gif", tagset! { "foo", "bar" });
         assert_write!("tagged.gif", tagset! {}, "no_tags.gif");
     }
+
+    #[test]
+    fn when_you() {
+        assert_read!("when_you.gif", tagset! {});
+    }
 }
