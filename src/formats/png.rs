@@ -10,16 +10,6 @@ pub const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 const TAG_CHUNK: &[u8; 4] = b"meMe";
 const END_CHUNK: &[u8; 4] = b"IEND";
 
-// Encodes a 4 bit big endian number.
-fn encode_big_endian(n: u32) -> [u8; 4] {
-    [(n >> 24 & 0xFF) as u8, (n >> 16 & 0xFF) as u8, (n >> 8 & 0xFF) as u8, (n & 0xFF) as u8]
-}
-
-// Decodes a 4 bit big endian number.
-fn decode_big_endian(src: &mut impl Read) -> Result<u32> {
-    Ok(read_bytes!(src, 4).iter().fold(0, |acc, n| (acc << 8) + *n as u32))
-}
-
 // PNG data is stored in chunks:
 // Each chunk starts with a 4 byte big endian number describing the length of the data within.
 // After that there's a 4 byte ASCII identifier for the chunk type (meMe in our case).
@@ -34,7 +24,7 @@ fn decode_big_endian(src: &mut impl Read) -> Result<u32> {
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
     let mut tags = crate::TagSet::new();
     loop {
-        let chunk_length = decode_big_endian(src)?;
+        let chunk_length = u32::from_be_bytes(read_bytes!(src, 4));
         let chunk_type = read_bytes!(src, 4);
         match &chunk_type {
             END_CHUNK => return Ok(tags),
@@ -42,7 +32,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
                 let bytes = read_bytes!(src, chunk_length as usize);
 
                 // Verify checksum
-                let checksum = decode_big_endian(src)?;
+                let checksum = u32::from_be_bytes(read_bytes!(src, 4));
                 let mut digest = crc::crc32::Digest::new(crc::crc32::IEEE);
                 digest.write(&chunk_type);
                 digest.write(&bytes);
@@ -72,7 +62,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
 pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
     dest.write_all(SIGNATURE)?;
     loop {
-        let chunk_length = decode_big_endian(src)?;
+        let chunk_length = u32::from_be_bytes(read_bytes!(src, 4));
         let chunk_type = read_bytes!(src, 4);
         match &chunk_type {
             END_CHUNK => {
@@ -97,14 +87,14 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
 
                 // Write it all
                 let mut buffer = Vec::new();
-                buffer.extend(&encode_big_endian(tags.len() as u32));
+                buffer.extend(&(tags.len() as u32).to_be_bytes());
                 buffer.extend(TAG_CHUNK);
                 buffer.extend(tags);
-                buffer.extend(&encode_big_endian(checksum));
+                buffer.extend(&checksum.to_be_bytes());
                 dest.write_all(&buffer)?;
 
                 // Write rest of the file
-                dest.write_all(&encode_big_endian(chunk_length))?;
+                dest.write_all(&chunk_length.to_be_bytes())?;
                 dest.write_all(&chunk_type)?;
                 dest.write_all(&read_bytes!(src, chunk_length as usize + 4))?;
 
@@ -116,7 +106,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
             }
             // Leave unrelated chunks unchanged
             _ => {
-                dest.write_all(&encode_big_endian(chunk_length))?;
+                dest.write_all(&chunk_length.to_be_bytes())?;
                 dest.write_all(&chunk_type)?;
                 dest.write_all(&read_bytes!(src, chunk_length as usize + 4))?;
             }
