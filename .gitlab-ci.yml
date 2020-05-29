@@ -1,7 +1,12 @@
 stages:
   - lint
-  - build
+  - test
   - bench
+
+cache:
+  key: stable-${CI_COMMIT_REF_SLUG}
+  paths:
+    - target/
 
 lint:
   stage: lint
@@ -11,23 +16,28 @@ lint:
   script:
     - cargo clippy --all-targets --all-features -- -D warnings
 
-stable:
-  stage: build
+stable-test:
+  stage: test
   image: rust:latest
   script:
-    - cargo build -vv
-    - cargo test -vv
+    - cargo test
 
-nightly:
-  stage: build
+nightly-test:
+  stage: test
   image: rustlang/rust:nightly
   script:
-    - cargo build -vv
-    - cargo test -vv
+    - cargo test
   allow_failure: true
+  cache:
+    key: nightly-${CI_COMMIT_REF_SLUG}
+    paths:
+      - target/
 
 bench:
   stage: bench
   image: rust:latest
   script:
-    - cargo bench 
+    - cargo bench
+  artifacts:
+    paths:
+      - target/criterion/
