@@ -26,7 +26,7 @@ type TagSet = std::collections::HashSet<String>;
 /// tagset_a.insert(String::from("bar"));
 ///
 /// // But using the macro makes it a breeze!
-/// let tagset_b = tagset!("foo", "bar");
+/// let tagset_b = tagset!{ "foo", "bar" };
 ///
 /// // And provides the same results!
 /// assert_eq!(tagset_a, tagset_b);
@@ -45,10 +45,8 @@ macro_rules! tagset {
 /// ```no_run
 /// # use std::fs::File;
 /// # use memedb_core::{read_tags};
-/// # fn main() -> std::io::Result<()> {
 /// let tags = read_tags(&mut File::open("foo.png")?);
-/// # Ok(())
-/// # }
+/// # Ok::<(), std::io::Error>(())
 /// ```
 /// In the case that the format is unrecognized, the function will return None.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>> {
@@ -59,10 +57,8 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>> {
 /// ```no_run
 /// # use std::{fs::File};
 /// # use memedb_core::{write_tags, tagset};
-/// # fn main() -> std::io::Result<()> {
 /// write_tags(&mut File::open("bar.png")?, &mut File::create("bar2.png")?, tagset! { "foo" });
-/// # Ok(())
-/// # }
+/// # Ok::<(), std::io::Error>(())
 /// ```
 /// In the case that the format is unrecognized, the function will return None.
 pub fn write_tags(
