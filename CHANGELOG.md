@@ -13,6 +13,7 @@
 - Follow [Conventional Commits guidelines](https://www.conventionalcommits.org).
 - Start [keeping a changelog](https://keepachangelog.com).
 - Add benchmark tests.
+- Add usage examples.
 
 ## [1.0.2] - 2019-12-09
 
