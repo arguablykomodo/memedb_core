@@ -214,25 +214,25 @@ mod tests {
     use crate::tagset;
 
     #[test]
-    fn normal() {
-        assert_read!("normal.gif", tagset! {});
-        assert_write!("normal.gif", tagset! { "foo", "bar" }, "tagged.gif");
+    fn untagged() {
+        assert_read!("minimal.gif", tagset! {});
+        assert_write!("minimal.gif", tagset! { "foo", "bar" }, "minimal_tagged.gif");
     }
 
     #[test]
-    fn no_tags() {
-        assert_read!("no_tags.gif", tagset! {});
-        assert_write!("no_tags.gif", tagset! { "foo", "bar" }, "tagged.gif");
+    fn empty() {
+        assert_read!("minimal_empty.gif", tagset! {});
+        assert_write!("minimal_empty.gif", tagset! { "foo", "bar" }, "minimal_tagged.gif");
     }
 
     #[test]
     fn tagged() {
-        assert_read!("tagged.gif", tagset! { "foo", "bar" });
-        assert_write!("tagged.gif", tagset! {}, "no_tags.gif");
+        assert_read!("minimal_tagged.gif", tagset! { "foo", "bar" });
+        assert_write!("minimal_tagged.gif", tagset! {}, "minimal_empty.gif");
     }
 
     #[test]
-    fn when_you() {
-        assert_read!("when_you.gif", tagset! {});
+    fn large() {
+        assert_read!("large.gif", tagset! {});
     }
 }

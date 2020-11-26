@@ -120,31 +120,31 @@ mod tests {
     use crate::tagset;
 
     #[test]
-    fn normal() {
-        assert_read!("normal.png", tagset! {});
-        assert_write!("normal.png", tagset! { "foo", "bar" }, "tagged.png");
+    fn untagged() {
+        assert_read!("minimal.png", tagset! {});
+        assert_write!("minimal.png", tagset! { "foo", "bar" }, "minimal_tagged.png");
     }
 
     #[test]
-    fn no_tags() {
-        assert_read!("no_tags.png", tagset! {});
-        assert_write!("no_tags.png", tagset! { "foo", "bar" }, "tagged.png");
+    fn empty() {
+        assert_read!("minimal_empty.png", tagset! {});
+        assert_write!("minimal_empty.png", tagset! { "foo", "bar" }, "minimal_tagged.png");
     }
 
     #[test]
     fn tagged() {
-        assert_read!("tagged.png", tagset! { "foo", "bar" });
-        assert_write!("tagged.png", tagset! {}, "no_tags.png");
+        assert_read!("minimal_tagged.png", tagset! { "foo", "bar" });
+        assert_write!("minimal_tagged.png", tagset! {}, "minimal_empty.png");
     }
 
     #[test]
     fn multiple_chunks() {
-        assert_read!("multiple_chunks.png", tagset! { "foo", "bar" });
-        assert_write!("tagged.png", tagset! { "foo", "bar" }, "tagged.png");
+        assert_read!("minimal_multiple.png", tagset! { "foo", "bar", "baz" });
+        assert_write!("minimal_multiple.png", tagset! { "foo", "bar" }, "minimal_tagged.png");
     }
 
     #[test]
-    fn when_you() {
-        assert_read!("when_you.png", tagset! {});
+    fn large() {
+        assert_read!("large.png", tagset! {});
     }
 }

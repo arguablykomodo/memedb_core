@@ -3,7 +3,7 @@ use std::{fs::File, io::sink, path::Path};
 
 #[test]
 fn read() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("images");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("media");
     for file in path.read_dir().unwrap() {
         let path = file.unwrap().path();
         let mut file = File::open(path).unwrap();
@@ -13,7 +13,7 @@ fn read() {
 
 #[test]
 fn write() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("images");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("media");
     for file in path.read_dir().unwrap() {
         let path = file.unwrap().path();
         let mut file = File::open(path).unwrap();

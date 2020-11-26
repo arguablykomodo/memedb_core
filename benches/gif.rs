@@ -3,7 +3,7 @@ use memedb_core::{read_tags, tagset, write_tags};
 use std::io::{sink, Cursor};
 
 pub fn read(c: &mut Criterion) {
-    let bytes = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/images/when_you.gif"));
+    let bytes = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/media/large.gif"));
     c.bench_function("gif read", |b| {
         b.iter_batched(
             || Cursor::new(&bytes[..]),
@@ -14,7 +14,7 @@ pub fn read(c: &mut Criterion) {
 }
 
 pub fn write(c: &mut Criterion) {
-    let bytes = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/images/when_you.gif"));
+    let bytes = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/media/large.gif"));
     c.bench_function("gif write", |b| {
         b.iter_batched(
             || Cursor::new(&bytes[..]),
