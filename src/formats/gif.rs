@@ -129,7 +129,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
                         return Ok(tags);
                     } else {
                         let tag_bytes = read_bytes!(src, tag_length as usize);
-                        tags.insert(std::str::from_utf8(&tag_bytes)?.to_string());
+                        tags.insert(String::from_utf8(tag_bytes)?);
                     }
                 }
             }

@@ -7,7 +7,7 @@ pub enum Error {
     #[error("IO Error")]
     Io(#[from] std::io::Error),
     #[error("Tags are not valid UTF8")]
-    Utf8(#[from] std::str::Utf8Error),
+    Utf8(#[from] std::string::FromUtf8Error),
     #[error("Corrupted tags in PNG data")]
     PngChecksum,
     #[error("Size of tags overflows maximum chunk size")]
