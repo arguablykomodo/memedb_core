@@ -6,6 +6,7 @@
 
 - Use trait impls to allow more generic inputs.
 - Change error type.
+- Change the way PNG tags are stored.
 - Add some restrictions on which tags are allowed (check the documentation of
   `is_tag_valid` for more information).
 

@@ -14,7 +14,7 @@ const END_CHUNK: &[u8; 4] = b"IEND";
 // Each chunk starts with a 4 byte big endian number describing the length of the data within.
 // After that there's a 4 byte ASCII identifier for the chunk type (meMe in our case).
 // Then comes the data, which is as long as the length described.
-// We store tags as utf8, with each tag ending with a semicolon.
+// We store tags with a size byte, followed by the tag itself.
 // And at the end there is a CRC-32 checksum of the chunk type and data.
 // An IEND chunk marks the end of the file
 // Related links:
@@ -28,7 +28,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
         match &chunk_type {
             END_CHUNK => return Ok(crate::TagSet::new()),
             TAG_CHUNK => {
-                let bytes = read_bytes!(src, chunk_length as usize);
+                let mut bytes = read_bytes!(src, chunk_length as usize);
 
                 // Verify checksum
                 let checksum = u32::from_be_bytes(read_bytes!(src, 4));
@@ -39,16 +39,12 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
                     return Err(Error::PngChecksum);
                 }
 
-                // Collect tags, split at semicolons
+                // Collect tags
                 let mut tags = TagSet::new();
-                let mut tag = String::new();
-                for byte in bytes {
-                    match byte {
-                        b';' => {
-                            tags.insert(std::mem::replace(&mut tag, String::new()));
-                        }
-                        _ => tag.push(byte as char),
-                    }
+                while !bytes.is_empty() {
+                    let size = bytes.remove(0) as usize;
+                    let bytes: Vec<u8> = bytes.drain(..size).collect();
+                    tags.insert(String::from_utf8(bytes)?);
                 }
                 return Ok(tags);
             }
@@ -74,7 +70,11 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
     // Encode tags
     let mut tags: Vec<_> = tags.into_iter().collect();
     tags.sort_unstable();
-    let tags: Vec<_> = tags.into_iter().map(|t| (t + ";").into_bytes()).flatten().collect();
+    let tags = tags.into_iter().fold(Vec::new(), |mut acc, tag| {
+        acc.push(tag.len() as u8);
+        acc.append(&mut tag.into_bytes());
+        acc
+    });
 
     // If this error is returned, someone has *way* too many tags
     if tags.len() as u64 >= std::u32::MAX as u64 {
