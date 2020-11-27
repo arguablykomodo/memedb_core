@@ -41,6 +41,26 @@ macro_rules! tagset {
     }};
 }
 
+/// Checks if a tag is valid.
+///
+/// Current restrictions:
+///
+/// - Can't be an empty string.
+/// - Can't have a length of over 256 bytes.
+///
+/// When writing tags, the library will call this function automatically and return an error if
+/// they are invalid.
+pub fn is_tag_valid(tag: impl AsRef<str>) -> bool {
+    !(tag.as_ref().is_empty() || tag.as_ref().len() > 0xFF)
+}
+
+/// Checks if a set of tags are valid.
+///
+/// Take a look at the documentation of [`is_tag_valid`](crate::is_tag_valid) for more information.
+pub fn are_tags_valid(tags: &TagSet) -> bool {
+    tags.iter().all(is_tag_valid)
+}
+
 /// Given a `src`, return the tags (if any) contained inside.
 /// ```no_run
 /// # use std::fs::File;
@@ -66,5 +86,9 @@ pub fn write_tags(
     dest: &mut impl Write,
     tags: TagSet,
 ) -> Result<Option<()>> {
-    formats::write_tags(src, dest, tags)
+    if are_tags_valid(&tags) {
+        formats::write_tags(src, dest, tags)
+    } else {
+        Err(error::Error::InvalidTags)
+    }
 }

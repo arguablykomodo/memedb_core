@@ -241,7 +241,7 @@ mod tests {
     #[ignore]
     fn qc_identity(bytes: Vec<u8>, tags: TagSet) -> bool {
         use std::io::Cursor;
-        if read_tags(&mut Cursor::new(&bytes)).is_ok() {
+        if crate::are_tags_valid(&tags) && read_tags(&mut Cursor::new(&bytes)).is_ok() {
             let mut dest = Vec::new();
             write_tags(&mut Cursor::new(bytes), &mut dest, tags.clone()).unwrap();
             let mut cursor = Cursor::new(dest);

@@ -2,6 +2,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
+    #[error("The tags provided are invalid (check the documentation of `is_tag_valid` for more information)")]
+    InvalidTags,
     #[error("IO Error")]
     Io(#[from] std::io::Error),
     #[error("Tags are not valid UTF8")]

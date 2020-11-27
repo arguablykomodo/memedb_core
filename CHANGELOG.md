@@ -6,6 +6,8 @@
 
 - Use trait impls to allow more generic inputs.
 - Change error type.
+- Add some restrictions on which tags are allowed (check the documentation of
+  `is_tag_valid` for more information).
 
 ### Changes
 
