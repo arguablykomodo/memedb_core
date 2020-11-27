@@ -126,6 +126,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
 mod tests {
     use super::*;
     use crate::tagset;
+    use quickcheck_macros::quickcheck;
 
     #[test]
     fn untagged() {
@@ -154,5 +155,20 @@ mod tests {
     #[test]
     fn large() {
         assert_read!("large.png", tagset! {});
+    }
+
+    #[quickcheck]
+    #[ignore]
+    fn qc_identity(bytes: Vec<u8>, tags: TagSet) -> bool {
+        use std::io::Cursor;
+        if read_tags(&mut Cursor::new(&bytes)).is_ok() {
+            let mut dest = Vec::new();
+            write_tags(&mut Cursor::new(bytes), &mut dest, tags.clone()).unwrap();
+            let mut cursor = Cursor::new(dest);
+            cursor.set_position(SIGNATURE.len() as u64);
+            read_tags(&mut cursor).unwrap() == tags
+        } else {
+            true
+        }
     }
 }

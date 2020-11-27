@@ -1,6 +1,7 @@
 stages:
   - lint
   - test
+  - fuzz
   - bench
 
 cache:
@@ -32,6 +33,12 @@ nightly-test:
     key: nightly-${CI_COMMIT_REF_SLUG}
     paths:
       - target/
+
+fuzz:
+  stage: fuzz
+  image: rust:latest
+  script:
+    - QUICKCHECK_TESTS=10000 cargo test qc -- --ignored
 
 bench:
   stage: bench
