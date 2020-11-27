@@ -159,6 +159,19 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
     let color_table_size = get_color_table_size(logical_screen_descriptor[4]);
     dest.write_all(&read_bytes!(src, color_table_size as usize)[..])?;
 
+    // Write tags
+    dest.write_all(&[0x21, 0xFF, 0x0B])?;
+    dest.write_all(IDENTIFIER)?;
+    let mut tags: Vec<String> = tags.iter().cloned().collect();
+    tags.sort_unstable();
+    let mut tag_bytes = Vec::new();
+    for tag in &mut tags {
+        tag_bytes.push(tag.len() as u8);
+        tag_bytes.append(&mut tag.as_bytes().to_vec());
+    }
+    tag_bytes.push(0);
+    dest.write_all(&tag_bytes[..])?;
+
     loop {
         match get_section(src)? {
             Tags(_, _, _, _) => skip_sub_blocks(src)?,
@@ -188,19 +201,6 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
                 write_sub_blocks(src, dest)?;
             }
             EOF(identifier) => {
-                dest.write_all(&[0x21, 0xFF, 0x0B])?;
-                dest.write_all(IDENTIFIER)?;
-
-                let mut tags: Vec<String> = tags.iter().cloned().collect();
-                tags.sort_unstable();
-                let mut tag_bytes = Vec::new();
-                for tag in &mut tags {
-                    tag_bytes.push(tag.len() as u8);
-                    tag_bytes.append(&mut tag.as_bytes().to_vec());
-                }
-                tag_bytes.push(0);
-                dest.write_all(&tag_bytes[..])?;
-
                 dest.write_all(&[identifier])?;
                 return Ok(());
             }

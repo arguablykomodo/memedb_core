@@ -22,12 +22,11 @@ const END_CHUNK: &[u8; 4] = b"IEND";
 // https://en.wikipedia.org/wiki/Portable_Network_Graphics
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
-    let mut tags = crate::TagSet::new();
     loop {
         let chunk_length = u32::from_be_bytes(read_bytes!(src, 4));
         let chunk_type = read_bytes!(src, 4);
         match &chunk_type {
-            END_CHUNK => return Ok(tags),
+            END_CHUNK => return Ok(crate::TagSet::new()),
             TAG_CHUNK => {
                 let bytes = read_bytes!(src, chunk_length as usize);
 
@@ -41,6 +40,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
                 }
 
                 // Collect tags, split at semicolons
+                let mut tags = TagSet::new();
                 let mut tag = String::new();
                 for byte in bytes {
                     match byte {
@@ -50,6 +50,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
                         _ => tag.push(byte as char),
                     }
                 }
+                return Ok(tags);
             }
             // We dont care about these, skip!
             _ => {
@@ -61,48 +62,55 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
 
 pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
     dest.write_all(SIGNATURE)?;
+
+    // The first chunk should always be IHDR, according to the spec, so we are going to read it manually
+    let chunk_length = u32::from_be_bytes(read_bytes!(src, 4));
+    let chunk_type = read_bytes!(src, 4);
+    debug_assert_eq!(&chunk_type, b"IHDR");
+    dest.write_all(&chunk_length.to_be_bytes())?;
+    dest.write_all(&chunk_type)?;
+    dest.write_all(&read_bytes!(src, chunk_length as usize + 4))?;
+
+    // Encode tags
+    let mut tags: Vec<_> = tags.into_iter().collect();
+    tags.sort_unstable();
+    let tags: Vec<_> = tags.into_iter().map(|t| (t + ";").into_bytes()).flatten().collect();
+
+    // If this error is returned, someone has *way* too many tags
+    if tags.len() as u64 >= std::u32::MAX as u64 {
+        return Err(Error::PngOverflow);
+    }
+
+    // Compute checksum
+    let checksum = {
+        let mut digest = crc::crc32::Digest::new(crc::crc32::IEEE);
+        digest.write(TAG_CHUNK);
+        digest.write(&tags);
+        digest.sum32()
+    };
+
+    // Write tag chunk
+    let mut buffer = Vec::new();
+    buffer.extend(&(tags.len() as u32).to_be_bytes());
+    buffer.extend(TAG_CHUNK);
+    buffer.extend(tags);
+    buffer.extend(&checksum.to_be_bytes());
+    dest.write_all(&buffer)?;
+
     loop {
         let chunk_length = u32::from_be_bytes(read_bytes!(src, 4));
         let chunk_type = read_bytes!(src, 4);
         match &chunk_type {
-            END_CHUNK => {
-                // Encode tags
-                let mut tags: Vec<_> = tags.into_iter().collect();
-                tags.sort_unstable();
-                let tags: Vec<_> =
-                    tags.into_iter().map(|t| (t + ";").into_bytes()).flatten().collect();
-
-                // If this error is returned, someone has *way* too many tags
-                if tags.len() as u64 >= std::u32::MAX as u64 {
-                    return Err(Error::PngOverflow);
-                }
-
-                // Compute checksum
-                let checksum = {
-                    let mut digest = crc::crc32::Digest::new(crc::crc32::IEEE);
-                    digest.write(TAG_CHUNK);
-                    digest.write(&tags);
-                    digest.sum32()
-                };
-
-                // Write it all
-                let mut buffer = Vec::new();
-                buffer.extend(&(tags.len() as u32).to_be_bytes());
-                buffer.extend(TAG_CHUNK);
-                buffer.extend(tags);
-                buffer.extend(&checksum.to_be_bytes());
-                dest.write_all(&buffer)?;
-
-                // Write rest of the file
-                dest.write_all(&chunk_length.to_be_bytes())?;
-                dest.write_all(&chunk_type)?;
-                dest.write_all(&read_bytes!(src, chunk_length as usize + 4))?;
-
-                return Ok(());
-            }
             // Skip old tags
             TAG_CHUNK => {
                 skip_bytes!(src, chunk_length as i64 + 4)?;
+            }
+            // Write rest of the file
+            END_CHUNK => {
+                dest.write_all(&chunk_length.to_be_bytes())?;
+                dest.write_all(&chunk_type)?;
+                dest.write_all(&read_bytes!(src, chunk_length as usize + 4))?;
+                return Ok(());
             }
             // Leave unrelated chunks unchanged
             _ => {
@@ -139,7 +147,7 @@ mod tests {
 
     #[test]
     fn multiple_chunks() {
-        assert_read!("minimal_multiple.png", tagset! { "foo", "bar", "baz" });
+        assert_read!("minimal_multiple.png", tagset! { "baz" });
         assert_write!("minimal_multiple.png", tagset! { "foo", "bar" }, "minimal_tagged.png");
     }
 

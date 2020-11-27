@@ -7,6 +7,10 @@
 - Use trait impls to allow more generic inputs.
 - Change error type.
 
+### Changes
+
+- Try to store tags near the beggining of files.
+
 ### Internal Changes
 
 - Completely rewrite library.
