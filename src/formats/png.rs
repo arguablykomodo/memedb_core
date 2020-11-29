@@ -62,7 +62,6 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
     // The first chunk should always be IHDR, according to the spec, so we are going to read it manually
     let chunk_length = u32::from_be_bytes(read_bytes!(src, 4));
     let chunk_type = read_bytes!(src, 4);
-    debug_assert_eq!(&chunk_type, b"IHDR");
     dest.write_all(&chunk_length.to_be_bytes())?;
     dest.write_all(&chunk_type)?;
     dest.write_all(&read_bytes!(src, chunk_length as usize + 4))?;
@@ -127,6 +126,7 @@ mod tests {
     use super::*;
     use crate::tagset;
     use quickcheck_macros::quickcheck;
+    use std::io::Cursor;
 
     #[test]
     fn untagged() {
@@ -159,8 +159,23 @@ mod tests {
 
     #[quickcheck]
     #[ignore]
+    fn qc_read_never_panics(bytes: Vec<u8>) -> bool {
+        let _ = read_tags(&mut Cursor::new(&bytes));
+        true
+    }
+
+    #[quickcheck]
+    #[ignore]
+    fn qc_write_never_panics(bytes: Vec<u8>, tags: TagSet) -> bool {
+        if crate::are_tags_valid(&tags) {
+            let _ = write_tags(&mut Cursor::new(&bytes), &mut std::io::sink(), tags);
+        }
+        true
+    }
+
+    #[quickcheck]
+    #[ignore]
     fn qc_identity(bytes: Vec<u8>, tags: TagSet) -> bool {
-        use std::io::Cursor;
         if crate::are_tags_valid(&tags) && read_tags(&mut Cursor::new(&bytes)).is_ok() {
             let mut dest = Vec::new();
             write_tags(&mut Cursor::new(bytes), &mut dest, tags.clone()).unwrap();
