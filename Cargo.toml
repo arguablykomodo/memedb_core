@@ -15,9 +15,10 @@ edition = "2018"
 gitlab = { repository = "memedb/memedb_core" }
 
 [features]
-default = ["gif", "png"]
+default = ["gif", "png", "riff"]
 gif = []
 png = ["crc"]
+riff = []
 
 [dependencies]
 crc = { version = "1.8.1", optional = true }
@@ -34,4 +35,8 @@ harness = false
 
 [[bench]]
 name = "gif"
+harness = false
+
+[[bench]]
+name = "riff"
 harness = false

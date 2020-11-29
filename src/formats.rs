@@ -2,6 +2,8 @@
 mod gif;
 #[cfg(feature = "png")]
 mod png;
+#[cfg(feature = "riff")]
+mod riff;
 
 use crate::{error::Result, TagSet};
 use std::io::{Read, Seek, Write};
@@ -12,6 +14,8 @@ enum Format {
     Gif,
     #[cfg(feature = "png")]
     Png,
+    #[cfg(feature = "riff")]
+    Riff,
 }
 
 const FORMATS: &[(&[u8], Format)] = &[
@@ -19,6 +23,8 @@ const FORMATS: &[(&[u8], Format)] = &[
     (gif::SIGNATURE, Format::Gif),
     #[cfg(feature = "png")]
     (png::SIGNATURE, Format::Png),
+    #[cfg(feature = "riff")]
+    (riff::SIGNATURE, Format::Riff),
 ];
 
 // Identifies the format for a file by succesively eliminating non-matching signatures until 1 remains.
@@ -53,6 +59,8 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>> {
             Format::Gif => gif::read_tags(src)?,
             #[cfg(feature = "png")]
             Format::Png => png::read_tags(src)?,
+            #[cfg(feature = "riff")]
+            Format::Riff => riff::read_tags(src)?,
         };
         Ok(Some(tags))
     } else {
@@ -71,6 +79,8 @@ pub fn write_tags(
             Format::Gif => gif::write_tags(src, dest, tags)?,
             #[cfg(feature = "png")]
             Format::Png => png::write_tags(src, dest, tags)?,
+            #[cfg(feature = "riff")]
+            Format::Riff => riff::write_tags(src, dest, tags)?,
         };
         Ok(Some(()))
     } else {

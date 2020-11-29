@@ -10,6 +10,11 @@
 - Add some restrictions on which tags are allowed (check the documentation of
   `is_tag_valid` for more information).
 
+### Additions
+
+- Added support for RIFF containers, which include WEBP, WAV, and AVI, among
+  others.
+
 ### Changes
 
 - Try to store tags near the beggining of files.

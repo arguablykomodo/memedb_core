@@ -78,7 +78,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
 
     // If this error is returned, someone has *way* too many tags
     if tags.len() as u64 >= std::u32::MAX as u64 {
-        return Err(Error::PngOverflow);
+        return Err(Error::ChunkSizeOverflow);
     }
 
     // Compute checksum
