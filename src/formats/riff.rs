@@ -31,12 +31,18 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
             let mut tags = TagSet::new();
             while !bytes.is_empty() {
                 let size = bytes.remove(0) as usize;
-                let bytes: Vec<u8> = bytes.drain(..size).collect();
+                let bytes: Vec<u8> = bytes.drain(..size.min(bytes.len())).collect();
                 tags.insert(String::from_utf8(bytes)?);
             }
             return Ok(tags);
         }
-        length += length & 1;
+        // If `length` was 0xFFFFFFFF, adding 1 would cause an overflow and that causes all sorts
+        // of issues. Here we do a saturating addition, which you would assume would actually be
+        // wrong as we would be off by 1 byte when reading, but turns out that a valid RIFF
+        // container will never have a subchunk with 0xFFFFFFFF length, as the maximum length of
+        // the container itself is 0xFFFFFFFF, and due to the name and length bytes, a chunk
+        // necessarily will have a smaller length than that.
+        length = length.saturating_add(length & 1);
         skip_bytes!(src, length as i64)?;
         use std::io::{Error, ErrorKind::UnexpectedEof};
         // Name + length + payload

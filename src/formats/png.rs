@@ -43,7 +43,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
                 let mut tags = TagSet::new();
                 while !bytes.is_empty() {
                     let size = bytes.remove(0) as usize;
-                    let bytes: Vec<u8> = bytes.drain(..size).collect();
+                    let bytes: Vec<u8> = bytes.drain(..size.min(bytes.len())).collect();
                     tags.insert(String::from_utf8(bytes)?);
                 }
                 return Ok(tags);
