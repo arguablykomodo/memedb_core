@@ -158,14 +158,12 @@ mod tests {
     }
 
     #[quickcheck]
-    #[ignore]
     fn qc_read_never_panics(bytes: Vec<u8>) -> bool {
         let _ = read_tags(&mut Cursor::new(&bytes));
         true
     }
 
     #[quickcheck]
-    #[ignore]
     fn qc_write_never_panics(bytes: Vec<u8>, tags: TagSet) -> bool {
         if crate::are_tags_valid(&tags) {
             let _ = write_tags(&mut Cursor::new(&bytes), &mut std::io::sink(), tags);
@@ -174,7 +172,6 @@ mod tests {
     }
 
     #[quickcheck]
-    #[ignore]
     fn qc_identity(bytes: Vec<u8>, tags: TagSet) -> bool {
         if crate::are_tags_valid(&tags) && read_tags(&mut Cursor::new(&bytes)).is_ok() {
             let mut dest = Vec::new();

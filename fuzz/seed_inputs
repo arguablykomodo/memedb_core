@@ -1,0 +1,10 @@
+tests/media/minimal.gif
+tests/media/minimal.png
+tests/media/minimal.webp
+tests/media/minimal_empty.gif
+tests/media/minimal_empty.png
+tests/media/minimal_empty.webp
+tests/media/minimal_tagged.gif
+tests/media/minimal_tagged.png
+tests/media/minimal_tagged.webp
+tests/media/minimal_multiple.png

@@ -38,7 +38,14 @@ fuzz:
   stage: fuzz
   image: rust:latest
   script:
-    - QUICKCHECK_TESTS=10000 cargo test qc -- --ignored
+    - cargo install cargo-fuzz # TODO: find a way to cache this
+    - cargo fuzz run --release -s none read_never_panics  -- -max_total_time=600 -seed_inputs=@fuzz/seed_inputs
+    - cargo fuzz run --release -s none write_never_panics -- -max_total_time=600 -seed_inputs=@fuzz/seed_inputs
+    - cargo fuzz run --release -s none identity           -- -max_total_time=600 -seed_inputs=@fuzz/seed_inputs
+  artifacts:
+    paths:
+      - fuzz/artifacts/
+      - fuzz/corpus/
 
 bench:
   stage: bench
