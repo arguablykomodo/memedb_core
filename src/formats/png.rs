@@ -5,7 +5,7 @@ use crate::{
 use crc::Hasher32;
 use std::io::{Read, Seek, Write};
 
-pub const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+pub const SIGNATURE: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
 
 const TAG_CHUNK: &[u8; 4] = b"meMe";
 const END_CHUNK: &[u8; 4] = b"IEND";
