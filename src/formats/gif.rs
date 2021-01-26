@@ -1,3 +1,36 @@
+// Incomprehensible TL;DR is as follows:
+//   Logical Screen Descriptor: 7 bytes
+//     5th byte is a packed byte:
+//       1st bit: global color table flag (0=no table)
+//       last 3 bits: global color table size ($S)
+//   Optional Global Color Table (marked by flag in Logical Screen Descriptor): 3*2^($S+1) bytes
+//   Sub-blocks: [$N, $N bytes] <- repeat until $N == 0
+//   Graphics Control Extension: 0x21, 0xF9, $N, $N bytes, then sub-blocks
+//   Image Descriptor: 0x2C, 8 bytes, packed byte:
+//     1st bit: local color table flag (0=no table)
+//     last 3 bits: local color table size ($S)
+//   Optional Local Color Table (marked by flag in Image Descriptor): 3*2^($S+1) bytes
+//   Image Data: 1 byte plus sub-blocks
+//   Plaintext Extension: 0x21, 0x01, $N, $N bytes, then sub-blocks
+//   Application Extension: 0x21, 0xFF, $N(0x0B), $N bytes, then sub-blocks
+//   Comment Extension: 0x21, 0xFE, then sub-blocks
+//   Trailer: 0x3B, EOF
+//
+// Layout:
+//   Logical Screen Descriptor ~ Global Color Table? ~ (
+//     Application Extension |
+//     Comment Extension |
+//     (Graphics Control Extension? ~ (
+//       (Image Descriptor ~ Local Color Table? ~ Image Data) |
+//       Plaintext Extension
+//     ))
+//   )* ~ Trailer
+//
+// tags are stored as sub-blocks inside an Application Extension with the label MEMETAGS1.0
+//
+// Related links:
+// https://www.matthewflickinger.com/lab/whatsinagif/bits_and_bytes.asp
+
 use crate::{
     error::{Error, Result},
     TagSet,
@@ -5,35 +38,6 @@ use crate::{
 use std::io::{Read, Seek, Write};
 
 pub const SIGNATURE: &[u8] = b"GIF89a";
-
-// Info comes from https://www.matthewflickinger.com/lab/whatsinagif/bits_and_bytes.asp
-// Incomprehensible TL;DR is as follows:
-// Logical Screen Descriptor: 7 bytes
-//   5th byte is a packed byte:
-//     1st bit: global color table flag (0=no table)
-//     last 3 bits: global color table size ($S)
-// Optional Global Color Table (marked by flag in Logical Screen Descriptor): 3*2^($S+1) bytes
-// Sub-blocks: [$N, $N bytes] <- repeat until $N == 0
-// Graphics Control Extension: 0x21, 0xF9, $N, $N bytes, then sub-blocks
-// Image Descriptor: 0x2C, 8 bytes, packed byte:
-//   1st bit: local color table flag (0=no table)
-//   last 3 bits: local color table size ($S)
-// Optional Local Color Table (marked by flag in Image Descriptor): 3*2^($S+1) bytes
-// Image Data: 1 byte plus sub-blocks
-// Plaintext Extension: 0x21, 0x01, $N, $N bytes, then sub-blocks
-// Application Extension: 0x21, 0xFF, $N(0x0B), $N bytes, then sub-blocks
-// Comment Extension: 0x21, 0xFE, then sub-blocks
-// Trailer: 0x3B, EOF
-// Layout:
-// Logical Screen Descriptor, Global Color Table?, (
-//   Application Extension |
-//   Comment Extension |
-//   (Graphics Control Extension?, (
-//     (Image Descriptor, Local Color Table?, Image Data) |
-//     Plaintext Extension
-//   ))
-// )*, Trailer
-// tags are stored as sub-blocks inside MEMETAGS1.0 Application Extension
 
 const IDENTIFIER: &[u8; 11] = b"MEMETAGS1.0";
 

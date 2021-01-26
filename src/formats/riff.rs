@@ -1,3 +1,17 @@
+// RIFF data is stored in chunks: Each chunk has a 4-byte ASCII name, a 4-byte little endian
+// length, and then a payload (plus an extra padding byte if the length is not even). The file is
+// composed of a single `RIFF` meta-chunk, that contains a 4-byte ASCII name describing the format
+// of the payload (`WEBP`, `AVI `, `WAV `, etc), and then a series of subchunks.
+//
+// we store tags in the `meme` chunk. The tags are encoded by a byte storing the length of the tag,
+// followed by the UTF-8 encoded bytes.
+//
+// Related links:
+// https://en.wikipedia.org/wiki/Interchange_File_Format
+
+// Cool fact: I actually wrote a 400-word rant on how much i hated this format but turns out i
+// actually didnt understand how it worked so nevermind all that.
+
 use crate::{
     error::{Error, Result},
     TagSet,
@@ -7,18 +21,6 @@ use std::io::{Read, Seek, Write};
 pub const SIGNATURE: &[u8] = b"RIFF";
 
 const TAG_CHUNK: &[u8; 4] = b"meme";
-
-// https://en.wikipedia.org/wiki/Interchange_File_Format
-//
-// RIFF is essentially the same as IFF but the lengths are in little endian. Each chunk has a
-// 4-byte ASCII name, a 4-byte little endian length, and then a payload (plus an extra padding byte
-// if the length is not even). The file is composed of one big RIFF meta-chunk, that contains a
-// 4-byte ASCII name describing the format of the payload (`WEBP`, `AVI `, `WAV `, etc), and then a
-// series of subchunks. We store our stuff in the `meme` chunk, and the tags are encoded just like
-// we do it in png.
-//
-// Cool fact: I actually wrote a 400-word rant on how much i hated this format but turns out i
-// actually didnt understand how it worked so nevermind all that.
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
     let mut file_length = u32::from_le_bytes(read_bytes!(src, 4)) - 4;

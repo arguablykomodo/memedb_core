@@ -1,3 +1,15 @@
+// PNG data is stored in chunks: Each chunk starts with a 4 byte big endian number describing the
+// length of the data within. After that there's a 4 byte ASCII identifier for the chunk type.
+// Then comes the data, which is as long as the length described. At the end there is a CRC-32
+// checksum of the chunk type and data. An IEND chunk marks the end of the file.
+//
+// we store tags in the `meMe` chunk. The tags are encoded by a byte storing the length of the tag,
+// followed by the UTF-8 encoded bytes.
+//
+// Related links:
+// http://www.libpng.org/pub/png/apps/pngcheck.html
+// https://en.wikipedia.org/wiki/Portable_Network_Graphics
+
 use crate::{
     error::{Error, Result},
     TagSet,
@@ -9,17 +21,6 @@ pub const SIGNATURE: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
 
 const TAG_CHUNK: &[u8; 4] = b"meMe";
 const END_CHUNK: &[u8; 4] = b"IEND";
-
-// PNG data is stored in chunks:
-// Each chunk starts with a 4 byte big endian number describing the length of the data within.
-// After that there's a 4 byte ASCII identifier for the chunk type (meMe in our case).
-// Then comes the data, which is as long as the length described.
-// We store tags with a size byte, followed by the tag itself.
-// And at the end there is a CRC-32 checksum of the chunk type and data.
-// An IEND chunk marks the end of the file
-// Related links:
-// http://www.libpng.org/pub/png/apps/pngcheck.html
-// https://en.wikipedia.org/wiki/Portable_Network_Graphics
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
     loop {
