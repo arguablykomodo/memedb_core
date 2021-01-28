@@ -34,15 +34,46 @@ nightly-test:
     paths:
       - target/
 
-fuzz:
+# TODO: find a way to cache the cargo-fuzz installation
+
+fuzz-png:
   stage: fuzz
   image: rust:latest
   script:
-    - cargo install cargo-fuzz # TODO: find a way to cache this
-    - cargo fuzz run --release -s none read_never_panics  -- -max_total_time=600 -seed_inputs=@fuzz/seed_inputs
-    - cargo fuzz run --release -s none write_never_panics -- -max_total_time=600 -seed_inputs=@fuzz/seed_inputs
-    - cargo fuzz run --release -s none identity           -- -max_total_time=600 -seed_inputs=@fuzz/seed_inputs
+    - cargo install cargo-fuzz
+    - cargo fuzz run --release -s none read_never_panics  -- -max_total_time=200 -seed_inputs=@fuzz/png_seeds
+    - cargo fuzz run --release -s none write_never_panics -- -max_total_time=200 -seed_inputs=@fuzz/png_seeds
+    - cargo fuzz run --release -s none identity           -- -max_total_time=200 -seed_inputs=@fuzz/png_seeds
   artifacts:
+    when: on_failure
+    paths:
+      - fuzz/artifacts/
+      - fuzz/corpus/
+
+fuzz-gif:
+  stage: fuzz
+  image: rust:latest
+  script:
+    - cargo install cargo-fuzz
+    - cargo fuzz run --release -s none read_never_panics  -- -max_total_time=200 -seed_inputs=@fuzz/gif_seeds
+    - cargo fuzz run --release -s none write_never_panics -- -max_total_time=200 -seed_inputs=@fuzz/gif_seeds
+    - cargo fuzz run --release -s none identity           -- -max_total_time=200 -seed_inputs=@fuzz/gif_seeds
+  artifacts:
+    when: on_failure
+    paths:
+      - fuzz/artifacts/
+      - fuzz/corpus/
+
+fuzz-riff:
+  stage: fuzz
+  image: rust:latest
+  script:
+    - cargo install cargo-fuzz
+    - cargo fuzz run --release -s none read_never_panics  -- -max_total_time=200 -seed_inputs=@fuzz/riff_seeds
+    - cargo fuzz run --release -s none write_never_panics -- -max_total_time=200 -seed_inputs=@fuzz/riff_seeds
+    - cargo fuzz run --release -s none identity           -- -max_total_time=200 -seed_inputs=@fuzz/riff_seeds
+  artifacts:
+    when: on_failure
     paths:
       - fuzz/artifacts/
       - fuzz/corpus/
