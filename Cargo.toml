@@ -25,8 +25,8 @@ crc = { version = "1.8.1", optional = true }
 thiserror = "1.0.23"
 
 [dev-dependencies]
-criterion = "0.3.3"
-quickcheck = "1.0.1"
+criterion = "0.3.4"
+quickcheck = { version = "1.0.3", default-features = false }
 quickcheck_macros = "1.0.0"
 
 [[bench]]
