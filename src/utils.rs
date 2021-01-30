@@ -26,10 +26,83 @@ macro_rules! skip_bytes {
 }
 
 #[cfg(test)]
+macro_rules! test_file {
+    ($name:literal, $ext:literal) => {
+        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/media/", $name, ".", $ext))
+    };
+}
+
+#[cfg(test)]
+macro_rules! make_tests {
+    ($ext:literal) => {
+        mod tests {
+            use super::*;
+            use crate::tagset;
+            use quickcheck_macros::quickcheck;
+            use std::io::Cursor;
+
+            const UNTAGGED: &[u8] = test_file!("minimal", $ext);
+            const EMPTY: &[u8] = test_file!("minimal_empty", $ext);
+            const TAGGED: &[u8] = test_file!("minimal_tagged", $ext);
+            const LARGE: &[u8] = test_file!("large", $ext);
+
+            #[test]
+            fn untagged() {
+                assert_read!(UNTAGGED, tagset! {});
+                assert_write!(UNTAGGED, tagset! { "foo", "bar" }, TAGGED);
+            }
+
+            #[test]
+            fn empty() {
+                assert_read!(EMPTY, tagset! {});
+                assert_write!(EMPTY, tagset! { "foo", "bar" }, TAGGED);
+            }
+
+            #[test]
+            fn tagged() {
+                assert_read!(TAGGED, tagset! { "foo", "bar" });
+                assert_write!(TAGGED, tagset! {}, EMPTY);
+            }
+
+            #[test]
+            fn large() {
+                assert_read!(LARGE, tagset! {});
+            }
+
+            #[quickcheck]
+            fn qc_read_never_panics(bytes: Vec<u8>) -> bool {
+                let _ = read_tags(&mut Cursor::new(&bytes));
+                true
+            }
+
+            #[quickcheck]
+            fn qc_write_never_panics(bytes: Vec<u8>, tags: TagSet) -> bool {
+                if crate::are_tags_valid(&tags) {
+                    let _ = write_tags(&mut Cursor::new(&bytes), &mut std::io::sink(), tags);
+                }
+                true
+            }
+
+            #[quickcheck]
+            fn qc_identity(bytes: Vec<u8>, tags: TagSet) -> bool {
+                if crate::are_tags_valid(&tags) && read_tags(&mut Cursor::new(&bytes)).is_ok() {
+                    let mut dest = Vec::new();
+                    write_tags(&mut Cursor::new(bytes), &mut dest, tags.clone()).unwrap();
+                    let mut cursor = Cursor::new(dest);
+                    cursor.set_position(SIGNATURE.len() as u64);
+                    read_tags(&mut cursor).unwrap() == tags
+                } else {
+                    true
+                }
+            }
+        }
+    };
+}
+
+#[cfg(test)]
 macro_rules! assert_read {
-    ($file:literal, $tags:expr) => {
-        let bytes = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/media/", $file));
-        let mut cursor = std::io::Cursor::new(bytes);
+    ($bytes:expr, $tags:expr) => {
+        let mut cursor = std::io::Cursor::new($bytes);
         cursor.set_position(SIGNATURE.len() as u64);
         assert_eq!(read_tags(&mut cursor).unwrap(), $tags);
     };
@@ -78,20 +151,16 @@ pub(crate) fn hexdump(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 macro_rules! assert_write {
-    ($file:literal, $tags:expr, $reference:literal) => {
-        let src = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/media/", $file));
-        let mut src = std::io::Cursor::new(src);
+    ($bytes:expr, $tags:expr, $reference:expr) => {
+        let mut src = std::io::Cursor::new($bytes);
         src.set_position(SIGNATURE.len() as u64);
 
         let mut dest = Vec::new();
         write_tags(&mut src, &mut dest, $tags).unwrap();
 
-        let reference =
-            include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/media/", $reference));
-
-        if (dest != reference) {
+        if (dest != $reference) {
             use crate::utils::hexdump;
-            panic!("\n{}:\n{}Got:\n{}", $reference, hexdump(reference), hexdump(&dest));
+            panic!("\nExpected:\n{}Got:\n{}", hexdump($reference), hexdump(&dest));
         }
     };
 }
