@@ -95,7 +95,7 @@ mod tests {
     #[test]
     fn correctly_identify_handlers() {
         for format in FORMATS {
-            assert_eq!(identify_format(&mut &format.0[..]).unwrap(), Some(format.1));
+            assert_eq!(identify_format(&mut &*format.0).unwrap(), Some(format.1));
         }
     }
 

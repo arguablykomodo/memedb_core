@@ -82,7 +82,7 @@ enum Section {
     GraphicsControl(u8, u8),
     Plaintext(u8, u8),
     ImageDescriptor(u8),
-    EOF(u8),
+    Eof(u8),
 }
 use Section::*;
 
@@ -113,7 +113,7 @@ fn get_section(src: &mut (impl Read + Seek)) -> Result<Section> {
             }
         }
         0x2C => ImageDescriptor(identifier),
-        0x3B => EOF(identifier),
+        0x3B => Eof(identifier),
         byte => return Err(Error::GifUnknownBlock(byte)),
     })
 }
@@ -141,7 +141,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
             GraphicsControl(_, _) | Plaintext(_, _) => {
                 let block_size = read_bytes!(src, 1);
                 skip_bytes!(src, block_size as i64)?;
-                skip_sub_blocks(src)?
+                skip_sub_blocks(src)?;
             }
             ImageDescriptor(_) => {
                 let data = read_bytes!(src, 9);
@@ -150,7 +150,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
                 skip_bytes!(src, color_table_size as i64 + 1)?;
                 skip_sub_blocks(src)?;
             }
-            EOF(_) => return Ok(TagSet::new()),
+            Eof(_) => return Ok(TagSet::new()),
         }
     }
 }
@@ -204,7 +204,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
                 dest.write_all(&read_bytes!(src, color_table_size as usize + 1)[..])?;
                 write_sub_blocks(src, dest)?;
             }
-            EOF(identifier) => {
+            Eof(identifier) => {
                 dest.write_all(&[identifier])?;
                 return Ok(());
             }
