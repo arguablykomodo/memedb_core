@@ -9,7 +9,7 @@ readme = "README.md"
 keywords = ["meme", "db", "tags"]
 categories = ["parser-implementations", "encoding", "data-structures"]
 license = "GPL-3.0-or-later"
-edition = "2018"
+edition = "2021"
 
 [badges]
 gitlab = { repository = "memedb/memedb_core" }
