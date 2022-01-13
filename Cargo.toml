@@ -21,11 +21,11 @@ png = ["crc"]
 riff = []
 
 [dependencies]
-crc = { version = "1.8.1", optional = true }
-thiserror = "1.0.23"
+crc = { version = "2.1.0", optional = true }
+thiserror = "1.0.30"
 
 [dev-dependencies]
-criterion = "0.3.4"
+criterion = "0.3.5"
 quickcheck = { version = "1.0.3", default-features = false }
 quickcheck_macros = "1.0.0"
 

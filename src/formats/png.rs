@@ -14,13 +14,14 @@ use crate::{
     error::{Error, Result},
     TagSet,
 };
-use crc::Hasher32;
 use std::io::{Read, Seek, Write};
 
 pub const SIGNATURE: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
 
 const TAG_CHUNK: &[u8; 4] = b"meMe";
 const END_CHUNK: &[u8; 4] = b"IEND";
+
+const CRC: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_ISO_HDLC);
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
     loop {
@@ -33,10 +34,10 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
 
                 // Verify checksum
                 let checksum = u32::from_be_bytes(read_bytes!(src, 4));
-                let mut digest = crc::crc32::Digest::new(crc::crc32::IEEE);
-                digest.write(&chunk_type);
-                digest.write(&bytes);
-                if checksum != digest.sum32() {
+                let mut digest = CRC.digest();
+                digest.update(&chunk_type);
+                digest.update(&bytes);
+                if checksum != digest.finalize() {
                     return Err(Error::PngChecksum);
                 }
 
@@ -83,10 +84,10 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
 
     // Compute checksum
     let checksum = {
-        let mut digest = crc::crc32::Digest::new(crc::crc32::IEEE);
-        digest.write(TAG_CHUNK);
-        digest.write(&tags);
-        digest.sum32()
+        let mut digest = CRC.digest();
+        digest.update(TAG_CHUNK);
+        digest.update(&tags);
+        digest.finalize()
     };
 
     // Write tag chunk
