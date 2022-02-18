@@ -2,7 +2,6 @@ stages:
   - lint
   - test
   - fuzz
-  - bench
 
 cache:
   key: stable-${CI_COMMIT_REF_SLUG}
@@ -77,12 +76,3 @@ fuzz-riff:
     paths:
       - fuzz/artifacts/
       - fuzz/corpus/
-
-bench:
-  stage: bench
-  image: rust:latest
-  script:
-    - cargo bench
-  artifacts:
-    paths:
-      - target/criterion/
