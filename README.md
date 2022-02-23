@@ -12,3 +12,4 @@ extending media formats to add custom metadata.
   - WAV
   - AVI
   - ...
+- JPEG

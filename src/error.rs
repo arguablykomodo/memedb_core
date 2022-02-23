@@ -39,6 +39,12 @@ pub enum Error {
     /// extension identifiers have to be 11 bytes wide.
     #[error("Application extension identifier should be 11, but found {0}")]
     GifWrongApplicationIdentifierLen(u8),
+    /// Every JPEG segment must start with a 0xFF byte, this error is thrown if they don't.
+    #[error("Segment Marker should be 0xFF, but found {0:X}")]
+    JpegMissingSegmentMarker(u8),
+    // An unrecognized JPEG Segment was found
+    #[error("Unknown segment found, expected 0xC0-0xD7, 0xD9-0xEF, or 0xFE, but found {0:X}")]
+    JpegUnknownSegment(u8),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

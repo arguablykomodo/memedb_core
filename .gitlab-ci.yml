@@ -40,9 +40,9 @@ fuzz-png:
   image: rust:latest
   script:
     - cargo install cargo-fuzz
-    - cargo fuzz run --release -s none read_never_panics  -- -max_total_time=200 -seed_inputs=@fuzz/png_seeds
-    - cargo fuzz run --release -s none write_never_panics -- -max_total_time=200 -seed_inputs=@fuzz/png_seeds
-    - cargo fuzz run --release -s none identity           -- -max_total_time=200 -seed_inputs=@fuzz/png_seeds
+    - cargo fuzz run --release -s none read_never_panics  -- -max_total_time=150 -seed_inputs=@fuzz/png_seeds
+    - cargo fuzz run --release -s none write_never_panics -- -max_total_time=150 -seed_inputs=@fuzz/png_seeds
+    - cargo fuzz run --release -s none identity           -- -max_total_time=150 -seed_inputs=@fuzz/png_seeds
   artifacts:
     when: on_failure
     paths:
@@ -54,9 +54,9 @@ fuzz-gif:
   image: rust:latest
   script:
     - cargo install cargo-fuzz
-    - cargo fuzz run --release -s none read_never_panics  -- -max_total_time=200 -seed_inputs=@fuzz/gif_seeds
-    - cargo fuzz run --release -s none write_never_panics -- -max_total_time=200 -seed_inputs=@fuzz/gif_seeds
-    - cargo fuzz run --release -s none identity           -- -max_total_time=200 -seed_inputs=@fuzz/gif_seeds
+    - cargo fuzz run --release -s none read_never_panics  -- -max_total_time=150 -seed_inputs=@fuzz/gif_seeds
+    - cargo fuzz run --release -s none write_never_panics -- -max_total_time=150 -seed_inputs=@fuzz/gif_seeds
+    - cargo fuzz run --release -s none identity           -- -max_total_time=150 -seed_inputs=@fuzz/gif_seeds
   artifacts:
     when: on_failure
     paths:
@@ -68,9 +68,23 @@ fuzz-riff:
   image: rust:latest
   script:
     - cargo install cargo-fuzz
-    - cargo fuzz run --release -s none read_never_panics  -- -max_total_time=200 -seed_inputs=@fuzz/riff_seeds
-    - cargo fuzz run --release -s none write_never_panics -- -max_total_time=200 -seed_inputs=@fuzz/riff_seeds
-    - cargo fuzz run --release -s none identity           -- -max_total_time=200 -seed_inputs=@fuzz/riff_seeds
+    - cargo fuzz run --release -s none read_never_panics  -- -max_total_time=150 -seed_inputs=@fuzz/riff_seeds
+    - cargo fuzz run --release -s none write_never_panics -- -max_total_time=150 -seed_inputs=@fuzz/riff_seeds
+    - cargo fuzz run --release -s none identity           -- -max_total_time=150 -seed_inputs=@fuzz/riff_seeds
+  artifacts:
+    when: on_failure
+    paths:
+      - fuzz/artifacts/
+      - fuzz/corpus/
+
+fuzz-jpeg:
+  stage: fuzz
+  image: rust:latest
+  script:
+    - cargo install cargo-fuzz
+    - cargo fuzz run --release -s none read_never_panics  -- -max_total_time=150 -seed_inputs=@fuzz/jpeg_seeds
+    - cargo fuzz run --release -s none write_never_panics -- -max_total_time=150 -seed_inputs=@fuzz/jpeg_seeds
+    - cargo fuzz run --release -s none identity           -- -max_total_time=150 -seed_inputs=@fuzz/jpeg_seeds
   artifacts:
     when: on_failure
     paths:

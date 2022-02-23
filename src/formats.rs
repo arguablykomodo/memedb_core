@@ -1,5 +1,7 @@
 #[cfg(feature = "gif")]
 mod gif;
+#[cfg(feature = "jpeg")]
+mod jpeg;
 #[cfg(feature = "png")]
 mod png;
 #[cfg(feature = "riff")]
@@ -16,6 +18,8 @@ enum Format {
     Png,
     #[cfg(feature = "riff")]
     Riff,
+    #[cfg(feature = "jpeg")]
+    Jpeg,
 }
 
 const FORMATS: &[(&[u8], Format)] = &[
@@ -25,6 +29,8 @@ const FORMATS: &[(&[u8], Format)] = &[
     (png::SIGNATURE, Format::Png),
     #[cfg(feature = "riff")]
     (riff::SIGNATURE, Format::Riff),
+    #[cfg(feature = "jpeg")]
+    (jpeg::SIGNATURE, Format::Jpeg),
 ];
 
 // Identifies the format for a file by succesively eliminating non-matching signatures until 1 remains.
@@ -61,6 +67,8 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>> {
             Format::Png => png::read_tags(src)?,
             #[cfg(feature = "riff")]
             Format::Riff => riff::read_tags(src)?,
+            #[cfg(feature = "jpeg")]
+            Format::Jpeg => jpeg::read_tags(src)?,
         };
         Ok(Some(tags))
     } else {
@@ -81,6 +89,8 @@ pub fn write_tags(
             Format::Png => png::write_tags(src, dest, tags)?,
             #[cfg(feature = "riff")]
             Format::Riff => riff::write_tags(src, dest, tags)?,
+            #[cfg(feature = "jpeg")]
+            Format::Jpeg => jpeg::write_tags(src, dest, tags)?,
         };
         Ok(Some(()))
     } else {
