@@ -10,7 +10,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4.2"
-memedb_core = { path = ".." }
+memedb_core = { path = "..", default-features = false }
 
 # Prevent this from interfering with workspaces
 [workspace]
