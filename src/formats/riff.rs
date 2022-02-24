@@ -23,13 +23,13 @@ pub const SIGNATURE: &[u8] = b"RIFF";
 const TAG_CHUNK: &[u8; 4] = b"meme";
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
-    let mut file_length = u32::from_le_bytes(read_bytes!(src, 4)) - 4;
+    let mut file_length = u32::from_le_bytes(read_bytes!(src, 4)).saturating_sub(4);
     skip_bytes!(src, 4)?;
     while file_length > 0 {
         let name = read_bytes!(src, 4);
         let mut length = u32::from_le_bytes(read_bytes!(src, 4));
         if &name == TAG_CHUNK {
-            let mut bytes = read_bytes!(src, length as usize);
+            let mut bytes = read_bytes!(src, length as u64);
             let mut tags = TagSet::new();
             while !bytes.is_empty() {
                 let size = bytes.remove(0) as usize;
@@ -48,7 +48,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
         skip_bytes!(src, length as i64)?;
         use std::io::{Error, ErrorKind::UnexpectedEof};
         // Name + length + payload
-        match file_length.checked_sub(4 + 4 + length) {
+        match file_length.checked_sub(length.saturating_add(4 + 4)) {
             Some(n) => file_length = n,
             None => return Err(Error::new(UnexpectedEof, "Incorrect chunk length").into()),
         }
@@ -67,7 +67,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
     let mut buffer = vec![0, 0, 0, 0];
 
     buffer.extend_from_slice(&read_bytes!(src, 4));
-    file_length -= 4;
+    file_length = file_length.saturating_sub(4);
 
     while file_length > 0 {
         let name = read_bytes!(src, 4);
@@ -79,9 +79,9 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
         } else {
             buffer.extend_from_slice(&name);
             buffer.extend_from_slice(&chunk_length_bytes);
-            buffer.extend_from_slice(&read_bytes!(src, chunk_length as usize));
+            buffer.extend_from_slice(&read_bytes!(src, chunk_length as u64));
         }
-        file_length -= 4 + 4 + chunk_length; // Name + length + payload
+        file_length = file_length.saturating_sub(4 + 4 + chunk_length); // Name + length + payload
     }
 
     // We have to store the tags at the end because webp wants the chunks to be in a specific order

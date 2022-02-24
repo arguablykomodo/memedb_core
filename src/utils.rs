@@ -13,8 +13,8 @@ macro_rules! read_bytes {
     }};
     // Use the heap otherwise
     ($src:expr, $n:expr) => {{
-        let mut bytes = vec![0; $n];
-        $src.read_exact(&mut bytes)?;
+        let mut bytes = Vec::new();
+        $src.take($n).read_to_end(&mut bytes)?;
         bytes
     }};
 }

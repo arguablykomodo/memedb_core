@@ -59,7 +59,7 @@ fn write_sub_blocks(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Resu
         if sub_block_length == 0 {
             return Ok(());
         } else {
-            dest.write_all(&read_bytes!(src, sub_block_length as usize)[..])?;
+            dest.write_all(&read_bytes!(src, sub_block_length as u64)[..])?;
         }
     }
 }
@@ -132,7 +132,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
                     if tag_length == 0 {
                         return Ok(tags);
                     } else {
-                        let tag_bytes = read_bytes!(src, tag_length as usize);
+                        let tag_bytes = read_bytes!(src, tag_length as u64);
                         tags.insert(String::from_utf8(tag_bytes)?);
                     }
                 }
@@ -161,7 +161,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
     let logical_screen_descriptor = read_bytes!(src, 7);
     dest.write_all(&logical_screen_descriptor)?;
     let color_table_size = get_color_table_size(logical_screen_descriptor[4]);
-    dest.write_all(&read_bytes!(src, color_table_size as usize)[..])?;
+    dest.write_all(&read_bytes!(src, color_table_size as u64)[..])?;
 
     // Write tags
     dest.write_all(&[0x21, 0xFF, 0x0B])?;
@@ -192,7 +192,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
                 dest.write_all(&[identifier, extension_type])?;
                 let block_size = read_bytes!(src, 1);
                 dest.write_all(&[block_size])?;
-                dest.write_all(&read_bytes!(src, block_size as usize)[..])?;
+                dest.write_all(&read_bytes!(src, block_size as u64)[..])?;
                 write_sub_blocks(src, dest)?;
             }
             ImageDescriptor(identifier) => {
@@ -201,7 +201,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
                 dest.write_all(&data)?;
                 let color_table_size = get_color_table_size(data[8]);
                 // Extra byte written is LZW Minimum Code Size, i dont know what it is and i dont care
-                dest.write_all(&read_bytes!(src, color_table_size as usize + 1)[..])?;
+                dest.write_all(&read_bytes!(src, color_table_size as u64 + 1)[..])?;
                 write_sub_blocks(src, dest)?;
             }
             Eof(identifier) => {
