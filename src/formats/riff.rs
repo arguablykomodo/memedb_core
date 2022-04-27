@@ -23,11 +23,12 @@ pub const SIGNATURE: &[u8] = b"RIFF";
 const TAG_CHUNK: &[u8; 4] = b"meme";
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
-    let mut file_length = u32::from_le_bytes(read_bytes!(src, 4)).saturating_sub(4);
+    let mut file_length = u32::from_le_bytes(read_bytes!(src, 4));
     skip_bytes!(src, 4)?;
+    file_length = file_length.checked_sub(4).ok_or(Error::InvalidRiffLength)?;
     while file_length > 0 {
         let name = read_bytes!(src, 4);
-        let mut length = u32::from_le_bytes(read_bytes!(src, 4));
+        let length = u32::from_le_bytes(read_bytes!(src, 4));
         if &name == TAG_CHUNK {
             let mut bytes = read_bytes!(src, length as u64);
             let mut tags = TagSet::new();
@@ -38,20 +39,13 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
             }
             return Ok(tags);
         }
-        // If `length` was 0xFFFFFFFF, adding 1 would cause an overflow and that causes all sorts
-        // of issues. Here we do a saturating addition, which you would assume would actually be
-        // wrong as we would be off by 1 byte when reading, but turns out that a valid RIFF
-        // container will never have a subchunk with 0xFFFFFFFF length, as the maximum length of
-        // the container itself is 0xFFFFFFFF, and due to the name and length bytes, a chunk
-        // necessarily will have a smaller length than that.
-        length = length.saturating_add(length & 1);
         skip_bytes!(src, length as i64)?;
-        use std::io::{Error, ErrorKind::UnexpectedEof};
-        // Name + length + payload
-        match file_length.checked_sub(length.saturating_add(4 + 4)) {
-            Some(n) => file_length = n,
-            None => return Err(Error::new(UnexpectedEof, "Incorrect chunk length").into()),
+        if (length & 1) == 1 {
+            skip_bytes!(src, 1)?;
         }
+        // Name + length + payload
+        file_length = file_length.checked_sub(4 + 4).ok_or(Error::InvalidRiffLength)?;
+        file_length = file_length.checked_sub(length).ok_or(Error::InvalidRiffLength)?;
     }
     Ok(TagSet::new())
 }
@@ -67,21 +61,28 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
     let mut buffer = vec![0, 0, 0, 0];
 
     buffer.extend_from_slice(&read_bytes!(src, 4));
-    file_length = file_length.saturating_sub(4);
+    file_length = file_length.checked_sub(4).ok_or(Error::InvalidRiffLength)?;
 
     while file_length > 0 {
         let name = read_bytes!(src, 4);
         let chunk_length_bytes = read_bytes!(src, 4);
-        let mut chunk_length = u32::from_le_bytes(chunk_length_bytes);
-        chunk_length += chunk_length & 1;
+        let chunk_length = u32::from_le_bytes(chunk_length_bytes);
         if &name == TAG_CHUNK {
             skip_bytes!(src, chunk_length as i64)?;
+            if (chunk_length & 1) == 1 {
+                skip_bytes!(src, 1)?;
+            }
         } else {
             buffer.extend_from_slice(&name);
             buffer.extend_from_slice(&chunk_length_bytes);
             buffer.extend_from_slice(&read_bytes!(src, chunk_length as u64));
+            if (chunk_length & 1) == 1 {
+                buffer.push(0);
+            }
         }
-        file_length = file_length.saturating_sub(4 + 4 + chunk_length); // Name + length + payload
+        // Name + length + payload
+        file_length = file_length.checked_sub(4 + 4).ok_or(Error::InvalidRiffLength)?;
+        file_length = file_length.checked_sub(chunk_length).ok_or(Error::InvalidRiffLength)?;
     }
 
     // We have to store the tags at the end because webp wants the chunks to be in a specific order
@@ -102,7 +103,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
     buffer.extend_from_slice(TAG_CHUNK);
     buffer.extend(tags_length.to_le_bytes().iter());
     buffer.extend(tag_bytes.into_iter());
-    if tags_length & 1 == 1 {
+    if (tags_length & 1) == 1 {
         buffer.push(0);
     }
 

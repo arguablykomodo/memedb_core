@@ -42,9 +42,13 @@ pub enum Error {
     /// Every JPEG segment must start with a 0xFF byte, this error is thrown if they don't.
     #[error("Segment Marker should be 0xFF, but found {0:X}")]
     JpegMissingSegmentMarker(u8),
-    // An unrecognized JPEG Segment was found
+    /// An unrecognized JPEG Segment was found.
     #[error("Unknown segment found, expected 0xC0-0xD7, 0xD9-0xEF, or 0xFE, but found {0:X}")]
     JpegUnknownSegment(u8),
+    /// The header of the RIFF file declares a file length that is smaller than the sum of lengths
+    /// reported by individual chunks.
+    #[error("Chunk lengths conflict with length according to RIFF header")]
+    InvalidRiffLength,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

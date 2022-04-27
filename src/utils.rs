@@ -14,8 +14,13 @@ macro_rules! read_bytes {
     // Use the heap otherwise
     ($src:expr, $n:expr) => {{
         let mut bytes = Vec::new();
-        $src.take($n).read_to_end(&mut bytes)?;
-        bytes
+        let n = $src.take($n).read_to_end(&mut bytes)?;
+        let result = if (n != $n as usize) {
+            Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))
+        } else {
+            Ok(bytes)
+        };
+        result?
     }};
 }
 
