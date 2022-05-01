@@ -42,6 +42,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
         skip_bytes!(src, length as i64)?;
         if (length & 1) == 1 {
             skip_bytes!(src, 1)?;
+            file_length = file_length.checked_sub(1).ok_or(Error::InvalidRiffLength)?;
         }
         // Name + length + payload
         file_length = file_length.checked_sub(4 + 4).ok_or(Error::InvalidRiffLength)?;
@@ -71,6 +72,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
             skip_bytes!(src, chunk_length as i64)?;
             if (chunk_length & 1) == 1 {
                 skip_bytes!(src, 1)?;
+                file_length = file_length.checked_sub(1).ok_or(Error::InvalidRiffLength)?;
             }
         } else {
             buffer.extend_from_slice(&name);
@@ -78,6 +80,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
             buffer.extend_from_slice(&read_bytes!(src, chunk_length as u64));
             if (chunk_length & 1) == 1 {
                 buffer.push(0);
+                file_length = file_length.checked_sub(1).ok_or(Error::InvalidRiffLength)?;
             }
         }
         // Name + length + payload

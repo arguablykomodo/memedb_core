@@ -58,8 +58,10 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
                 let length = u16::from_be_bytes(read_bytes!(src, 2)).saturating_sub(2) as usize;
                 if length < TAGS_ID.len() {
                     skip_bytes!(src, length as i64)?;
+                    byte = read_marker(src)?;
                 } else if read_bytes!(src, TAGS_ID.len() as u64) != TAGS_ID {
                     skip_bytes!(src, length.saturating_sub(TAGS_ID.len()) as i64)?;
+                    byte = read_marker(src)?;
                 } else {
                     let length = length.saturating_sub(TAGS_ID.len());
                     let mut bytes = read_bytes!(src, length as u64);
