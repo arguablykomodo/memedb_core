@@ -54,9 +54,9 @@ fuzz-gif:
   image: rustlang/rust:nightly
   script:
     - cargo install cargo-fuzz
-    - ./fuzz.sh gif read_never_panics
-    - ./fuzz.sh gif write_never_panics
-    - ./fuzz.sh gif identity
+    - ./fuzz.sh gif read_never_panics gif
+    - ./fuzz.sh gif write_never_panics gif
+    - ./fuzz.sh gif identity gif
   artifacts:
     when: on_failure
     paths:
@@ -68,9 +68,9 @@ fuzz-riff:
   image: rustlang/rust:nightly
   script:
     - cargo install cargo-fuzz
-    - ./fuzz.sh riff read_never_panics
-    - ./fuzz.sh riff write_never_panics
-    - ./fuzz.sh riff identity
+    - ./fuzz.sh riff read_never_panics webp
+    - ./fuzz.sh riff write_never_panics webp
+    - ./fuzz.sh riff identity webp
   artifacts:
     when: on_failure
     paths:
@@ -82,9 +82,9 @@ fuzz-jpeg:
   image: rustlang/rust:nightly
   script:
     - cargo install cargo-fuzz
-    - ./fuzz.sh jpeg read_never_panics
-    - ./fuzz.sh jpeg write_never_panics
-    - ./fuzz.sh jpeg identity
+    - ./fuzz.sh jpeg read_never_panics jpeg
+    - ./fuzz.sh jpeg write_never_panics jpeg
+    - ./fuzz.sh jpeg identity jpeg
   artifacts:
     when: on_failure
     paths:
