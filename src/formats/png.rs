@@ -92,10 +92,10 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
 
     // Write tag chunk
     let mut buffer = Vec::new();
-    buffer.extend(&(tags.len() as u32).to_be_bytes());
+    buffer.extend((tags.len() as u32).to_be_bytes());
     buffer.extend(TAG_CHUNK);
     buffer.extend(tags);
-    buffer.extend(&checksum.to_be_bytes());
+    buffer.extend(checksum.to_be_bytes());
     dest.write_all(&buffer)?;
 
     loop {

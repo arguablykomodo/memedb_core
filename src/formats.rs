@@ -42,7 +42,7 @@ fn identify_format(src: &mut impl Read) -> Result<Option<Format>> {
     for i in 0..length {
         let byte = read_bytes!(src, 1);
         // Filter non-matching signatures
-        formats = formats.into_iter().filter(|(s, _)| s[i] == byte).collect();
+        formats.retain(|(s, _)| s[i] == byte);
         match formats.len() {
             1 => {
                 let format = formats[0];
