@@ -43,7 +43,7 @@ const IDENTIFIER: &[u8; 11] = b"MEMETAGS1.0";
 
 fn skip_sub_blocks(src: &mut (impl Read + Seek)) -> Result<()> {
     loop {
-        let sub_block_length = read_bytes!(src, 1);
+        let sub_block_length = read_bytes!(src, 1)?;
         if sub_block_length == 0 {
             return Ok(());
         } else {
@@ -54,12 +54,12 @@ fn skip_sub_blocks(src: &mut (impl Read + Seek)) -> Result<()> {
 
 fn write_sub_blocks(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Result<()> {
     loop {
-        let sub_block_length = read_bytes!(src, 1);
+        let sub_block_length = read_bytes!(src, 1)?;
         dest.write_all(&[sub_block_length])?;
         if sub_block_length == 0 {
             return Ok(());
         } else {
-            dest.write_all(&read_bytes!(src, sub_block_length as u64)[..])?;
+            dest.write_all(&read_bytes!(src, sub_block_length as u64)?[..])?;
         }
     }
 }
@@ -87,19 +87,19 @@ enum Section {
 use Section::*;
 
 fn get_section(src: &mut (impl Read + Seek)) -> Result<Section> {
-    let identifier = read_bytes!(src, 1);
+    let identifier = read_bytes!(src, 1)?;
     Ok(match identifier {
         // Extension
         0x21 => {
-            let extension_type = read_bytes!(src, 1);
+            let extension_type = read_bytes!(src, 1)?;
             match extension_type {
                 // Application Extension
                 0xFF => {
-                    let block_size = read_bytes!(src, 1); // Should always be 11
+                    let block_size = read_bytes!(src, 1)?; // Should always be 11
                     if block_size != 11 {
                         return Err(Error::GifWrongApplicationIdentifierLen(block_size));
                     }
-                    let application_identifier = read_bytes!(src, 11);
+                    let application_identifier = read_bytes!(src, 11)?;
                     if &application_identifier == IDENTIFIER {
                         Tags(identifier, extension_type, block_size, application_identifier)
                     } else {
@@ -119,7 +119,7 @@ fn get_section(src: &mut (impl Read + Seek)) -> Result<Section> {
 }
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
-    let logical_screen_descriptor = read_bytes!(src, 7);
+    let logical_screen_descriptor = read_bytes!(src, 7)?;
     let color_table_size = get_color_table_size(logical_screen_descriptor[4]);
     skip_bytes!(src, color_table_size as i64)?;
 
@@ -128,23 +128,23 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
             Tags(_, _, _, _) => {
                 let mut tags = TagSet::new();
                 loop {
-                    let tag_length = read_bytes!(src, 1);
+                    let tag_length = read_bytes!(src, 1)?;
                     if tag_length == 0 {
                         return Ok(tags);
                     } else {
-                        let tag_bytes = read_bytes!(src, tag_length as u64);
+                        let tag_bytes = read_bytes!(src, tag_length as u64)?;
                         tags.insert(String::from_utf8(tag_bytes)?);
                     }
                 }
             }
             Application(_, _, _, _) | Comment(_, _) => skip_sub_blocks(src)?,
             GraphicsControl(_, _) | Plaintext(_, _) => {
-                let block_size = read_bytes!(src, 1);
+                let block_size = read_bytes!(src, 1)?;
                 skip_bytes!(src, block_size as i64)?;
                 skip_sub_blocks(src)?;
             }
             ImageDescriptor(_) => {
-                let data = read_bytes!(src, 9);
+                let data = read_bytes!(src, 9)?;
                 let color_table_size = get_color_table_size(data[8]);
                 // Extra byte skipped is LZW Minimum Code Size, i dont know what it is and i dont care
                 skip_bytes!(src, color_table_size as i64 + 1)?;
@@ -158,10 +158,10 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
 pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
     dest.write_all(SIGNATURE)?;
 
-    let logical_screen_descriptor = read_bytes!(src, 7);
+    let logical_screen_descriptor = read_bytes!(src, 7)?;
     dest.write_all(&logical_screen_descriptor)?;
     let color_table_size = get_color_table_size(logical_screen_descriptor[4]);
-    dest.write_all(&read_bytes!(src, color_table_size as u64)[..])?;
+    dest.write_all(&read_bytes!(src, color_table_size as u64)?[..])?;
 
     // Write tags
     dest.write_all(&[0x21, 0xFF, 0x0B])?;
@@ -190,18 +190,18 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
             }
             GraphicsControl(identifier, extension_type) | Plaintext(identifier, extension_type) => {
                 dest.write_all(&[identifier, extension_type])?;
-                let block_size = read_bytes!(src, 1);
+                let block_size = read_bytes!(src, 1)?;
                 dest.write_all(&[block_size])?;
-                dest.write_all(&read_bytes!(src, block_size as u64)[..])?;
+                dest.write_all(&read_bytes!(src, block_size as u64)?[..])?;
                 write_sub_blocks(src, dest)?;
             }
             ImageDescriptor(identifier) => {
                 dest.write_all(&[identifier])?;
-                let data = read_bytes!(src, 9);
+                let data = read_bytes!(src, 9)?;
                 dest.write_all(&data)?;
                 let color_table_size = get_color_table_size(data[8]);
                 // Extra byte written is LZW Minimum Code Size, i dont know what it is and i dont care
-                dest.write_all(&read_bytes!(src, color_table_size as u64 + 1)[..])?;
+                dest.write_all(&read_bytes!(src, color_table_size as u64 + 1)?[..])?;
                 write_sub_blocks(src, dest)?;
             }
             Eof(identifier) => {

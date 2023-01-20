@@ -2,25 +2,23 @@ macro_rules! read_bytes {
     // Return u8 if reading one byte
     ($src:expr, 1) => {{
         let mut byte = 0;
-        $src.read_exact(std::slice::from_mut(&mut byte))?;
-        byte
+        $src.read_exact(std::slice::from_mut(&mut byte)).map(|_| byte)
     }};
     // Use the stack if the length is known at compile-time
     ($src:expr, $n:literal) => {{
         let mut bytes = [0; $n];
-        $src.read_exact(&mut bytes)?;
-        bytes
+        $src.read_exact(&mut bytes).map(|_| bytes)
     }};
     // Use the heap otherwise
     ($src:expr, $n:expr) => {{
         let mut bytes = Vec::new();
-        let n = $src.take($n).read_to_end(&mut bytes)?;
-        let result = if (n != $n as usize) {
-            Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))
-        } else {
-            Ok(bytes)
-        };
-        result?
+        $src.take($n).read_to_end(&mut bytes).and_then(|n| {
+            if (n != $n as usize) {
+                Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))
+            } else {
+                Ok(bytes)
+            }
+        })
     }};
 }
 

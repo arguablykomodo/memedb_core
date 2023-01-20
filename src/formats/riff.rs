@@ -23,14 +23,14 @@ pub const SIGNATURE: &[u8] = b"RIFF";
 const TAG_CHUNK: &[u8; 4] = b"meme";
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
-    let mut file_length = u32::from_le_bytes(read_bytes!(src, 4));
+    let mut file_length = u32::from_le_bytes(read_bytes!(src, 4)?);
     skip_bytes!(src, 4)?;
     file_length = file_length.checked_sub(4).ok_or(Error::InvalidRiffLength)?;
     while file_length > 0 {
-        let name = read_bytes!(src, 4);
-        let length = u32::from_le_bytes(read_bytes!(src, 4));
+        let name = read_bytes!(src, 4)?;
+        let length = u32::from_le_bytes(read_bytes!(src, 4)?);
         if &name == TAG_CHUNK {
-            let mut bytes = read_bytes!(src, length as u64);
+            let mut bytes = read_bytes!(src, length as u64)?;
             let mut tags = TagSet::new();
             while !bytes.is_empty() {
                 let size = bytes.remove(0) as usize;
@@ -54,19 +54,19 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
 pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
     dest.write_all(SIGNATURE)?;
 
-    let mut file_length = u32::from_le_bytes(read_bytes!(src, 4));
+    let mut file_length = u32::from_le_bytes(read_bytes!(src, 4)?);
 
     // Because we need to write the length of the file at the beggining, we need to store
     // everything in a buffer before writing. Those four 0x0 bytes are placeholders for the final
     // length
     let mut buffer = vec![0, 0, 0, 0];
 
-    buffer.extend_from_slice(&read_bytes!(src, 4));
+    buffer.extend_from_slice(&read_bytes!(src, 4)?);
     file_length = file_length.checked_sub(4).ok_or(Error::InvalidRiffLength)?;
 
     while file_length > 0 {
-        let name = read_bytes!(src, 4);
-        let chunk_length_bytes = read_bytes!(src, 4);
+        let name = read_bytes!(src, 4)?;
+        let chunk_length_bytes = read_bytes!(src, 4)?;
         let chunk_length = u32::from_le_bytes(chunk_length_bytes);
         if &name == TAG_CHUNK {
             skip_bytes!(src, chunk_length as i64)?;
@@ -77,7 +77,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
         } else {
             buffer.extend_from_slice(&name);
             buffer.extend_from_slice(&chunk_length_bytes);
-            buffer.extend_from_slice(&read_bytes!(src, chunk_length as u64));
+            buffer.extend_from_slice(&read_bytes!(src, chunk_length as u64)?);
             if (chunk_length & 1) == 1 {
                 buffer.push(0);
                 file_length = file_length.checked_sub(1).ok_or(Error::InvalidRiffLength)?;

@@ -40,14 +40,14 @@ fn identify_format(src: &mut impl Read) -> Result<Option<Format>> {
     // Get length of longest signature, so we know when to stop iterating
     let length = FORMATS.iter().map(|(s, _)| s.len()).max().expect("no handlers found");
     for i in 0..length {
-        let byte = read_bytes!(src, 1);
+        let byte = read_bytes!(src, 1)?;
         // Filter non-matching signatures
         formats.retain(|(s, _)| s[i] == byte);
         match formats.len() {
             1 => {
                 let format = formats[0];
                 // Verify the rest of the signature
-                if read_bytes!(src, (format.0.len() - i) as u64 - 1) == format.0[i + 1..] {
+                if read_bytes!(src, (format.0.len() - i) as u64 - 1)? == format.0[i + 1..] {
                     return Ok(Some(format.1));
                 } else {
                     return Ok(None);
