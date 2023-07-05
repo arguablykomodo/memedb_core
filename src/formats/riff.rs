@@ -12,17 +12,19 @@
 // Cool fact: I actually wrote a 400-word rant on how much i hated this format but turns out i
 // actually didnt understand how it worked so nevermind all that.
 
+pub const MAGIC: &[u8] = b"RIFF";
+pub const OFFSET: usize = 0;
+
 use crate::{
     error::{Error, Result},
     TagSet,
 };
 use std::io::{Read, Seek, Write};
 
-pub const SIGNATURE: &[u8] = b"RIFF";
-
 const TAG_CHUNK: &[u8; 4] = b"meme";
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
+    skip_bytes!(src, MAGIC.len() as i64)?;
     let mut file_length = u32::from_le_bytes(read_bytes!(src, 4)?);
     skip_bytes!(src, 4)?;
     file_length = file_length.checked_sub(4).ok_or(Error::InvalidRiffLength)?;
@@ -52,7 +54,8 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
 }
 
 pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
-    dest.write_all(SIGNATURE)?;
+    skip_bytes!(src, MAGIC.len() as i64)?;
+    dest.write_all(MAGIC)?;
 
     let mut file_length = u32::from_le_bytes(read_bytes!(src, 4)?);
 

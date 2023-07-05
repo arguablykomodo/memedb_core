@@ -92,7 +92,6 @@ macro_rules! make_tests {
                     let mut dest = Vec::new();
                     write_tags(&mut Cursor::new(bytes), &mut dest, tags.clone()).unwrap();
                     let mut cursor = Cursor::new(dest);
-                    cursor.set_position(SIGNATURE.len() as u64);
                     read_tags(&mut cursor).unwrap() == tags
                 } else {
                     true
@@ -106,7 +105,6 @@ macro_rules! make_tests {
 macro_rules! assert_read {
     ($bytes:expr, $tags:expr) => {
         let mut cursor = std::io::Cursor::new($bytes);
-        cursor.set_position(SIGNATURE.len() as u64);
         assert_eq!(read_tags(&mut cursor).unwrap(), $tags);
     };
 }
@@ -156,7 +154,6 @@ pub(crate) fn hexdump(bytes: &[u8]) -> String {
 macro_rules! assert_write {
     ($bytes:expr, $tags:expr, $reference:expr) => {
         let mut src = std::io::Cursor::new($bytes);
-        src.set_position(SIGNATURE.len() as u64);
 
         let mut dest = Vec::new();
         write_tags(&mut src, &mut dest, $tags).unwrap();

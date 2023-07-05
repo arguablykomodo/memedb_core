@@ -10,13 +10,14 @@
 // http://www.libpng.org/pub/png/apps/pngcheck.html
 // https://en.wikipedia.org/wiki/Portable_Network_Graphics
 
+pub const MAGIC: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
+pub const OFFSET: usize = 0;
+
 use crate::{
     error::{Error, Result},
     TagSet,
 };
 use std::io::{Read, Seek, Write};
-
-pub const SIGNATURE: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
 
 const TAG_CHUNK: &[u8; 4] = b"meMe";
 const END_CHUNK: &[u8; 4] = b"IEND";
@@ -24,6 +25,7 @@ const END_CHUNK: &[u8; 4] = b"IEND";
 const CRC: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_ISO_HDLC);
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
+    skip_bytes!(src, MAGIC.len() as i64)?;
     loop {
         let chunk_length = u32::from_be_bytes(read_bytes!(src, 4)?);
         let chunk_type = read_bytes!(src, 4)?;
@@ -59,7 +61,8 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
 }
 
 pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
-    dest.write_all(SIGNATURE)?;
+    skip_bytes!(src, MAGIC.len() as i64)?;
+    dest.write_all(MAGIC)?;
 
     // The first chunk should always be IHDR, according to the spec, so we are going to read it manually
     let chunk_length = u32::from_be_bytes(read_bytes!(src, 4)?);

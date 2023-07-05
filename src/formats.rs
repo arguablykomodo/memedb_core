@@ -10,8 +10,8 @@ mod riff;
 use crate::{error::Result, TagSet};
 use std::io::{Read, Seek, Write};
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-enum Format {
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum FormatTag {
     #[cfg(feature = "gif")]
     Gif,
     #[cfg(feature = "png")]
@@ -22,55 +22,68 @@ enum Format {
     Jpeg,
 }
 
-const FORMATS: &[(&[u8], Format)] = &[
+#[derive(Copy, Clone, Debug)]
+pub struct Format {
+    magic: &'static [u8],
+    offset: usize,
+    tag: FormatTag,
+}
+
+impl Format {
+    const fn new(magic: &'static [u8], offset: usize, tag: FormatTag) -> Self {
+        Self { magic, offset, tag }
+    }
+}
+
+const FORMATS: &[Format] = &[
     #[cfg(feature = "gif")]
-    (gif::SIGNATURE, Format::Gif),
+    Format::new(gif::MAGIC, gif::OFFSET, FormatTag::Gif),
     #[cfg(feature = "png")]
-    (png::SIGNATURE, Format::Png),
+    Format::new(png::MAGIC, png::OFFSET, FormatTag::Png),
     #[cfg(feature = "riff")]
-    (riff::SIGNATURE, Format::Riff),
+    Format::new(riff::MAGIC, riff::OFFSET, FormatTag::Riff),
     #[cfg(feature = "jpeg")]
-    (jpeg::SIGNATURE, Format::Jpeg),
+    Format::new(jpeg::MAGIC, jpeg::OFFSET, FormatTag::Jpeg),
 ];
 
 // Identifies the format for a file by succesively eliminating non-matching signatures until 1 remains.
-fn identify_format(src: &mut impl Read) -> Result<Option<Format>> {
-    let mut formats = FORMATS.to_vec();
-
-    // Get length of longest signature, so we know when to stop iterating
-    let length = FORMATS.iter().map(|(s, _)| s.len()).max().expect("no handlers found");
-    for i in 0..length {
-        let byte = read_bytes!(src, 1)?;
-        // Filter non-matching signatures
-        formats.retain(|(s, _)| s[i] == byte);
-        match formats.len() {
+fn identify_format(src: &mut impl Read) -> Result<Option<FormatTag>> {
+    let mut active = Vec::new();
+    let mut next = FORMATS.to_vec();
+    let mut i = 0;
+    while let Some(byte) = read_bytes!(src, 1).map_or_else(
+        |e| if e.kind() == std::io::ErrorKind::UnexpectedEof { Ok(None) } else { Err(e) },
+        |b| Ok(Some(b)),
+    )? {
+        let (new, still_next) = next.into_iter().partition(|f| f.offset == i);
+        next = still_next;
+        active = active.into_iter().chain(new).filter(|f| byte == f.magic[i - f.offset]).collect();
+        i += 1;
+        match active.len() {
             1 => {
-                let format = formats[0];
-                // Verify the rest of the signature
-                if read_bytes!(src, (format.0.len() - i) as u64 - 1)? == format.0[i + 1..] {
-                    return Ok(Some(format.1));
-                } else {
-                    return Ok(None);
-                }
+                let Format { magic, offset, tag } = active[0];
+                let rest = read_bytes!(src, (magic.len() + offset - i) as u64)?;
+                return Ok((rest == magic[i - offset..]).then_some(tag));
             }
-            0 => return Ok(None),
-            _ => (),
+            0 if next.is_empty() => return Ok(None), // TODO: skip useless bytes
+            _ => continue,
         }
     }
-    unreachable!()
+    Ok(None)
 }
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>> {
     if let Some(format) = identify_format(src)? {
+        src.seek(std::io::SeekFrom::Start(0))?;
         let tags = match format {
             #[cfg(feature = "gif")]
-            Format::Gif => gif::read_tags(src)?,
+            FormatTag::Gif => gif::read_tags(src)?,
             #[cfg(feature = "png")]
-            Format::Png => png::read_tags(src)?,
+            FormatTag::Png => png::read_tags(src)?,
             #[cfg(feature = "riff")]
-            Format::Riff => riff::read_tags(src)?,
+            FormatTag::Riff => riff::read_tags(src)?,
             #[cfg(feature = "jpeg")]
-            Format::Jpeg => jpeg::read_tags(src)?,
+            FormatTag::Jpeg => jpeg::read_tags(src)?,
         };
         Ok(Some(tags))
     } else {
@@ -84,15 +97,16 @@ pub fn write_tags(
     tags: TagSet,
 ) -> Result<Option<()>> {
     if let Some(format) = identify_format(src)? {
+        src.seek(std::io::SeekFrom::Start(0))?;
         match format {
             #[cfg(feature = "gif")]
-            Format::Gif => gif::write_tags(src, dest, tags)?,
+            FormatTag::Gif => gif::write_tags(src, dest, tags)?,
             #[cfg(feature = "png")]
-            Format::Png => png::write_tags(src, dest, tags)?,
+            FormatTag::Png => png::write_tags(src, dest, tags)?,
             #[cfg(feature = "riff")]
-            Format::Riff => riff::write_tags(src, dest, tags)?,
+            FormatTag::Riff => riff::write_tags(src, dest, tags)?,
             #[cfg(feature = "jpeg")]
-            Format::Jpeg => jpeg::write_tags(src, dest, tags)?,
+            FormatTag::Jpeg => jpeg::write_tags(src, dest, tags)?,
         };
         Ok(Some(()))
     } else {
@@ -107,7 +121,9 @@ mod tests {
     #[test]
     fn correctly_identify_handlers() {
         for format in FORMATS {
-            assert_eq!(identify_format(&mut &*format.0).unwrap(), Some(format.1));
+            let mut bytes = vec![0; format.offset];
+            bytes.extend_from_slice(format.magic);
+            assert_eq!(identify_format(&mut &bytes[..]).unwrap(), Some(format.tag));
         }
     }
 

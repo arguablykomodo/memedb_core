@@ -31,13 +31,14 @@
 // Related links:
 // https://www.matthewflickinger.com/lab/whatsinagif/bits_and_bytes.asp
 
+pub const MAGIC: &[u8] = b"GIF89a";
+pub const OFFSET: usize = 0;
+
 use crate::{
     error::{Error, Result},
     TagSet,
 };
 use std::io::{Read, Seek, Write};
-
-pub const SIGNATURE: &[u8] = b"GIF89a";
 
 const IDENTIFIER: &[u8; 11] = b"MEMETAGS1.0";
 
@@ -119,6 +120,7 @@ fn get_section(src: &mut (impl Read + Seek)) -> Result<Section> {
 }
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
+    skip_bytes!(src, MAGIC.len() as i64)?;
     let logical_screen_descriptor = read_bytes!(src, 7)?;
     let color_table_size = get_color_table_size(logical_screen_descriptor[4]);
     skip_bytes!(src, color_table_size as i64)?;
@@ -156,7 +158,8 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
 }
 
 pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
-    dest.write_all(SIGNATURE)?;
+    skip_bytes!(src, MAGIC.len() as i64)?;
+    dest.write_all(MAGIC)?;
 
     let logical_screen_descriptor = read_bytes!(src, 7)?;
     dest.write_all(&logical_screen_descriptor)?;

@@ -10,13 +10,14 @@
 // https://www.w3.org/Graphics/JPEG/jpeg3.pdf
 // https://www.media.mit.edu/pia/Research/deepview/exif.html
 
+pub const MAGIC: &[u8] = b"\xFF\xD8";
+pub const OFFSET: usize = 0;
+
 use crate::{
     error::{Error, Result},
     TagSet,
 };
 use std::io::{Read, Seek, Write};
-
-pub const SIGNATURE: &[u8] = b"\xFF\xD8";
 
 const TAGS_ID: &[u8] = b"MemeDB\x00";
 const JFIF_ID: &[u8] = b"JFIF\x00";
@@ -49,6 +50,7 @@ fn skip_ecs(src: &mut (impl Read + Seek)) -> Result<u8> {
 }
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
+    skip_bytes!(src, MAGIC.len() as i64)?;
     let mut byte = read_marker(src)?;
     loop {
         match byte {
@@ -132,7 +134,8 @@ fn write_tags_segment(dest: &mut impl Write, tags: TagSet) -> Result<()> {
 }
 
 pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
-    dest.write_all(SIGNATURE)?;
+    skip_bytes!(src, MAGIC.len() as i64)?;
+    dest.write_all(MAGIC)?;
     let mut tags = Some(tags);
     let mut byte = read_marker(src)?;
     loop {
