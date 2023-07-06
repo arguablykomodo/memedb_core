@@ -1,25 +1,19 @@
-macro_rules! read_bytes {
-    // Return u8 if reading one byte
-    ($src:expr, 1) => {{
-        let mut byte = 0;
-        $src.read_exact(std::slice::from_mut(&mut byte)).map(|_| byte)
-    }};
-    // Use the stack if the length is known at compile-time
-    ($src:expr, $n:literal) => {{
-        let mut bytes = [0; $n];
-        $src.read_exact(&mut bytes).map(|_| bytes)
-    }};
-    // Use the heap otherwise
-    ($src:expr, $n:expr) => {{
-        let mut bytes = Vec::new();
-        $src.take($n).read_to_end(&mut bytes).and_then(|n| {
-            if (n != $n as usize) {
-                Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))
-            } else {
-                Ok(bytes)
-            }
-        })
-    }};
+pub fn read_byte(src: &mut impl std::io::Read) -> Result<u8, std::io::Error> {
+    let mut byte = 0;
+    src.read_exact(std::slice::from_mut(&mut byte))?;
+    Ok(byte)
+}
+
+pub fn read_stack<const N: usize>(src: &mut impl std::io::Read) -> Result<[u8; N], std::io::Error> {
+    let mut bytes = [0; N];
+    src.read_exact(&mut bytes)?;
+    Ok(bytes)
+}
+
+pub fn read_heap(src: &mut impl std::io::Read, n: usize) -> Result<Vec<u8>, std::io::Error> {
+    let mut bytes = vec![0; n];
+    src.read_exact(&mut bytes)?;
+    Ok(bytes)
 }
 
 macro_rules! skip_bytes {

@@ -1,6 +1,7 @@
 pub const MAGIC: &[u8] = b"ftyp";
 pub const OFFSET: usize = 4;
 
+use crate::utils::{read_heap, read_stack};
 use crate::TagSet;
 use std::io::{Read, Seek, Write};
 
@@ -41,15 +42,15 @@ impl Box {
     }
 
     fn read(src: &mut impl Read) -> Result<Box, std::io::Error> {
-        let short_size = u32::from_be_bytes(read_bytes!(src, 4)?);
-        let short_type = read_bytes!(src, 4)?;
+        let short_size = u32::from_be_bytes(read_stack::<4>(src)?);
+        let short_type = read_stack::<4>(src)?;
         let r#box = Box {
             size: match short_size {
-                1 => Size::Long(u64::from_be_bytes(read_bytes!(src, 8)?)),
+                1 => Size::Long(u64::from_be_bytes(read_stack::<8>(src)?)),
                 _ => Size::Short(short_size),
             },
             r#type: match &short_type {
-                b"uuid" => Type::Long(read_bytes!(src, 16)?),
+                b"uuid" => Type::Long(read_stack::<16>(src)?),
                 _ => Type::Short(short_type),
             },
         };
@@ -95,7 +96,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> crate::Result<crate::TagSet> {
         }
         match r#box.r#type {
             Type::Long(MEMEDB_UUID) => {
-                let mut bytes = read_bytes!(src, r#box.data_size())?;
+                let mut bytes = read_heap(src, r#box.data_size() as usize)?;
                 let mut tags = TagSet::new();
                 while !bytes.is_empty() {
                     let size = bytes.remove(0) as usize;

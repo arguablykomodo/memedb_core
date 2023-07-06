@@ -14,6 +14,7 @@ pub const MAGIC: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
 pub const OFFSET: usize = 0;
 
 use crate::{
+    utils::{read_stack, read_heap},
     error::{Error, Result},
     TagSet,
 };
@@ -27,15 +28,15 @@ const CRC: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_ISO_HDLC);
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
     skip_bytes!(src, MAGIC.len() as i64)?;
     loop {
-        let chunk_length = u32::from_be_bytes(read_bytes!(src, 4)?);
-        let chunk_type = read_bytes!(src, 4)?;
+        let chunk_length = u32::from_be_bytes(read_stack::<4>(src)?);
+        let chunk_type = read_stack::<4>(src)?;
         match &chunk_type {
             END_CHUNK => return Ok(crate::TagSet::new()),
             TAG_CHUNK => {
-                let mut bytes = read_bytes!(src, chunk_length as u64)?;
+                let mut bytes = read_heap(src, chunk_length as usize)?;
 
                 // Verify checksum
-                let checksum = u32::from_be_bytes(read_bytes!(src, 4)?);
+                let checksum = u32::from_be_bytes(read_stack::<4>(src)?);
                 let mut digest = CRC.digest();
                 digest.update(&chunk_type);
                 digest.update(&bytes);
@@ -65,11 +66,11 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
     dest.write_all(MAGIC)?;
 
     // The first chunk should always be IHDR, according to the spec, so we are going to read it manually
-    let chunk_length = u32::from_be_bytes(read_bytes!(src, 4)?);
-    let chunk_type = read_bytes!(src, 4)?;
+    let chunk_length = u32::from_be_bytes(read_stack::<4>(src)?);
+    let chunk_type = read_stack::<4>(src)?;
     dest.write_all(&chunk_length.to_be_bytes())?;
     dest.write_all(&chunk_type)?;
-    dest.write_all(&read_bytes!(src, chunk_length as u64 + 4)?)?;
+    dest.write_all(&read_heap(src, chunk_length as usize + 4)?)?;
 
     // Encode tags
     let mut tags: Vec<_> = tags.into_iter().collect();
@@ -102,8 +103,8 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
     dest.write_all(&buffer)?;
 
     loop {
-        let chunk_length = u32::from_be_bytes(read_bytes!(src, 4)?);
-        let chunk_type = read_bytes!(src, 4)?;
+        let chunk_length = u32::from_be_bytes(read_stack::<4>(src)?);
+        let chunk_type = read_stack::<4>(src)?;
         match &chunk_type {
             // Skip old tags
             TAG_CHUNK => {
@@ -113,14 +114,14 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
             END_CHUNK => {
                 dest.write_all(&chunk_length.to_be_bytes())?;
                 dest.write_all(&chunk_type)?;
-                dest.write_all(&read_bytes!(src, chunk_length as u64 + 4)?)?;
+                dest.write_all(&read_heap(src, chunk_length as usize + 4)?)?;
                 return Ok(());
             }
             // Leave unrelated chunks unchanged
             _ => {
                 dest.write_all(&chunk_length.to_be_bytes())?;
                 dest.write_all(&chunk_type)?;
-                dest.write_all(&read_bytes!(src, chunk_length as u64 + 4)?)?;
+                dest.write_all(&read_heap(src, chunk_length as usize + 4)?)?;
             }
         }
     }

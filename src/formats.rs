@@ -9,7 +9,7 @@ mod png;
 #[cfg(feature = "riff")]
 mod riff;
 
-use crate::{error::Result, TagSet};
+use crate::{error::Result, TagSet, utils::{read_byte, read_heap}};
 use std::io::{Read, Seek, Write};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -57,7 +57,7 @@ fn identify_format(src: &mut impl Read) -> Result<Option<FormatTag>> {
     let mut active = Vec::new();
     let mut next = FORMATS.to_vec();
     let mut i = 0;
-    while let Some(byte) = read_bytes!(src, 1).map_or_else(
+    while let Some(byte) = read_byte(src).map_or_else(
         |e| if e.kind() == std::io::ErrorKind::UnexpectedEof { Ok(None) } else { Err(e) },
         |b| Ok(Some(b)),
     )? {
@@ -68,7 +68,7 @@ fn identify_format(src: &mut impl Read) -> Result<Option<FormatTag>> {
         match active.len() {
             1 => {
                 let Format { magic, offset, tag } = active[0];
-                let rest = read_bytes!(src, (magic.len() + offset - i) as u64)?;
+                let rest = read_heap(src, magic.len() + offset - i)?;
                 return Ok((rest == magic[i - offset..]).then_some(tag));
             }
             0 if next.is_empty() => return Ok(None), // TODO: skip useless bytes

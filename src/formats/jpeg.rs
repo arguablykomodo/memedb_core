@@ -14,6 +14,7 @@ pub const MAGIC: &[u8] = b"\xFF\xD8";
 pub const OFFSET: usize = 0;
 
 use crate::{
+    utils::{read_stack, read_byte, read_heap},
     error::{Error, Result},
     TagSet,
 };
@@ -24,24 +25,24 @@ const JFIF_ID: &[u8] = b"JFIF\x00";
 const EXIF_ID: &[u8] = b"Exif\x00\x00";
 
 fn read_marker(src: &mut (impl Read + Seek)) -> Result<u8> {
-    let marker = read_bytes!(src, 1)?;
+    let marker = read_byte(src)?;
     if marker == 0xFF {
-        Ok(read_bytes!(src, 1)?)
+        Ok(read_byte(src)?)
     } else {
         Err(Error::JpegMissingSegmentMarker(marker))
     }
 }
 
 fn skip_segment(src: &mut (impl Read + Seek)) -> Result<()> {
-    let length = u16::from_be_bytes(read_bytes!(src, 2)?).saturating_sub(2);
+    let length = u16::from_be_bytes(read_stack::<2>(src)?).saturating_sub(2);
     skip_bytes!(src, length as i64)?;
     Ok(())
 }
 
 fn skip_ecs(src: &mut (impl Read + Seek)) -> Result<u8> {
     loop {
-        if read_bytes!(src, 1)? == 0xFF {
-            let byte = read_bytes!(src, 1)?;
+        if read_byte(src)? == 0xFF {
+            let byte = read_byte(src)?;
             if byte != 0x00 {
                 return Ok(byte);
             }
@@ -57,16 +58,16 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
             0x00..=0xBF | 0xD8 | 0xF0..=0xFD | 0xFF => return Err(Error::JpegUnknownSegment(byte)),
             // APP4
             0xE4 => {
-                let length = u16::from_be_bytes(read_bytes!(src, 2)?).saturating_sub(2) as usize;
+                let length = u16::from_be_bytes(read_stack::<2>(src)?).saturating_sub(2) as usize;
                 if length < TAGS_ID.len() {
                     skip_bytes!(src, length as i64)?;
                     byte = read_marker(src)?;
-                } else if read_bytes!(src, TAGS_ID.len() as u64)? != TAGS_ID {
+                } else if read_heap(src, TAGS_ID.len())? != TAGS_ID {
                     skip_bytes!(src, length.saturating_sub(TAGS_ID.len()) as i64)?;
                     byte = read_marker(src)?;
                 } else {
                     let length = length.saturating_sub(TAGS_ID.len());
-                    let mut bytes = read_bytes!(src, length as u64)?;
+                    let mut bytes = read_heap(src, length)?;
                     let mut tags = TagSet::new();
                     while !bytes.is_empty() {
                         let size = bytes.remove(0) as usize;
@@ -97,17 +98,17 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
 }
 
 fn write_segment(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Result<()> {
-    let length_bytes = read_bytes!(src, 2)?;
+    let length_bytes = read_stack::<2>(src)?;
     dest.write_all(&length_bytes)?;
-    dest.write_all(&read_bytes!(src, u16::from_be_bytes(length_bytes).saturating_sub(2) as u64)?)?;
+    dest.write_all(&read_heap(src, u16::from_be_bytes(length_bytes).saturating_sub(2) as usize)?)?;
     Ok(())
 }
 
 fn write_ecs(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Result<u8> {
     loop {
-        let byte = read_bytes!(src, 1)?;
+        let byte = read_byte(src)?;
         if byte == 0xFF {
-            let second_byte = read_bytes!(src, 1)?;
+            let second_byte = read_byte(src)?;
             if second_byte != 0x00 {
                 return Ok(second_byte);
             }
@@ -143,9 +144,9 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
             0x00..=0xBF | 0xD8 | 0xF0..=0xFD | 0xFF => return Err(Error::JpegUnknownSegment(byte)),
             // APP0-APP1
             0xE0..=0xE1 => {
-                let length_bytes = read_bytes!(src, 2)?;
-                let length = u16::from_be_bytes(length_bytes).saturating_sub(2) as u64;
-                let content_bytes = read_bytes!(src, length)?;
+                let length_bytes = read_stack::<2>(src)?;
+                let length = u16::from_be_bytes(length_bytes).saturating_sub(2);
+                let content_bytes = read_heap(src, length as usize)?;
                 dest.write_all(&[0xFF, byte])?;
                 dest.write_all(&length_bytes)?;
                 dest.write_all(&content_bytes)?;
@@ -162,9 +163,9 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
             }
             // APP4
             0xE4 => {
-                let length_bytes = read_bytes!(src, 2)?;
-                let length = u16::from_be_bytes(length_bytes).saturating_sub(2) as u64;
-                let content_bytes = read_bytes!(src, length)?;
+                let length_bytes = read_stack::<2>(src)?;
+                let length = u16::from_be_bytes(length_bytes).saturating_sub(2);
+                let content_bytes = read_heap(src, length as usize)?;
                 if !content_bytes.starts_with(TAGS_ID) {
                     dest.write_all(&[0xFF, byte])?;
                     dest.write_all(&length_bytes)?;
