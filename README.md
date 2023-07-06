@@ -5,16 +5,16 @@ extending media formats to add custom metadata.
 
 ## Supported Formats
 
-- PNG
 - GIF
-- RIFF containers:
-  - WEBP
-  - WAV
-  - AVI
-  - ...
-- JPEG
 - ISO base media file format
   - MP4
   - JPEG 2000
   - 3GP
+  - ...
+- JPEG
+- PNG
+- RIFF containers:
+  - WEBP
+  - WAV
+  - AVI
   - ...

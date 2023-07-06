@@ -16,14 +16,14 @@ use std::io::{Read, Seek, Write};
 enum FormatTag {
     #[cfg(feature = "gif")]
     Gif,
+    #[cfg(feature = "isobmff")]
+    Isobmff,
+    #[cfg(feature = "jpeg")]
+    Jpeg,
     #[cfg(feature = "png")]
     Png,
     #[cfg(feature = "riff")]
     Riff,
-    #[cfg(feature = "jpeg")]
-    Jpeg,
-    #[cfg(feature = "isobmff")]
-    Isobmff,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -42,14 +42,14 @@ impl Format {
 const FORMATS: &[Format] = &[
     #[cfg(feature = "gif")]
     Format::new(gif::MAGIC, gif::OFFSET, FormatTag::Gif),
+    #[cfg(feature = "isobmff")]
+    Format::new(isobmff::MAGIC, isobmff::OFFSET, FormatTag::Isobmff),
+    #[cfg(feature = "jpeg")]
+    Format::new(jpeg::MAGIC, jpeg::OFFSET, FormatTag::Jpeg),
     #[cfg(feature = "png")]
     Format::new(png::MAGIC, png::OFFSET, FormatTag::Png),
     #[cfg(feature = "riff")]
     Format::new(riff::MAGIC, riff::OFFSET, FormatTag::Riff),
-    #[cfg(feature = "jpeg")]
-    Format::new(jpeg::MAGIC, jpeg::OFFSET, FormatTag::Jpeg),
-    #[cfg(feature = "isobmff")]
-    Format::new(isobmff::MAGIC, isobmff::OFFSET, FormatTag::Isobmff),
 ];
 
 // Identifies the format for a file by succesively eliminating non-matching signatures until 1 remains.
@@ -84,14 +84,14 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>> {
         let tags = match format {
             #[cfg(feature = "gif")]
             FormatTag::Gif => gif::read_tags(src)?,
+            #[cfg(feature = "isobmff")]
+            FormatTag::Isobmff => isobmff::read_tags(src)?,
+            #[cfg(feature = "jpeg")]
+            FormatTag::Jpeg => jpeg::read_tags(src)?,
             #[cfg(feature = "png")]
             FormatTag::Png => png::read_tags(src)?,
             #[cfg(feature = "riff")]
             FormatTag::Riff => riff::read_tags(src)?,
-            #[cfg(feature = "jpeg")]
-            FormatTag::Jpeg => jpeg::read_tags(src)?,
-            #[cfg(feature = "isobmff")]
-            FormatTag::Isobmff => isobmff::read_tags(src)?,
         };
         Ok(Some(tags))
     } else {
@@ -109,14 +109,14 @@ pub fn write_tags(
         match format {
             #[cfg(feature = "gif")]
             FormatTag::Gif => gif::write_tags(src, dest, tags)?,
+            #[cfg(feature = "isobmff")]
+            FormatTag::Isobmff => isobmff::write_tags(src, dest, tags)?,
+            #[cfg(feature = "jpeg")]
+            FormatTag::Jpeg => jpeg::write_tags(src, dest, tags)?,
             #[cfg(feature = "png")]
             FormatTag::Png => png::write_tags(src, dest, tags)?,
             #[cfg(feature = "riff")]
             FormatTag::Riff => riff::write_tags(src, dest, tags)?,
-            #[cfg(feature = "jpeg")]
-            FormatTag::Jpeg => jpeg::write_tags(src, dest, tags)?,
-            #[cfg(feature = "isobmff")]
-            FormatTag::Isobmff => isobmff::write_tags(src, dest, tags)?,
         };
         Ok(Some(()))
     } else {

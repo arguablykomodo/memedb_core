@@ -2,7 +2,13 @@
 //!
 //! It has been mainly designed for the categorization of memes.
 
-#[cfg(not(any(feature = "png", feature = "gif", feature = "riff", feature = "jpeg")))]
+#[cfg(not(any(
+    feature = "gif",
+    feature = "isobmff",
+    feature = "jpeg",
+    feature = "png",
+    feature = "riff"
+)))]
 compile_error!("At least one format feature must be enabled for this crate to be usable.");
 
 #[macro_use]
