@@ -1,7 +1,7 @@
 pub const MAGIC: &[u8] = b"ftyp";
 pub const OFFSET: usize = 4;
 
-use crate::utils::{read_heap, read_stack};
+use crate::utils::{read_heap, read_stack, skip};
 use crate::TagSet;
 use std::io::{Read, Seek, Write};
 
@@ -105,7 +105,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> crate::Result<crate::TagSet> {
                 }
                 return Ok(tags);
             }
-            _ => skip_bytes!(src, r#box.data_size() as i64)?,
+            _ => skip(src, r#box.data_size() as i64)?,
         };
     }
     Ok(TagSet::new())
@@ -132,7 +132,7 @@ pub fn write_tags(
         }
         match r#box.r#type {
             Type::Long(MEMEDB_UUID) => {
-                skip_bytes!(src, r#box.data_size() as i64)?;
+                skip(src, r#box.data_size() as i64)?;
             }
             _ => {
                 r#box.write(dest)?;

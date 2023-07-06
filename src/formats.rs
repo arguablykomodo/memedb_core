@@ -9,7 +9,11 @@ mod png;
 #[cfg(feature = "riff")]
 mod riff;
 
-use crate::{error::Result, TagSet, utils::{read_byte, read_heap}};
+use crate::{
+    error::Result,
+    utils::{read_byte, read_heap},
+    TagSet,
+};
 use std::io::{Read, Seek, Write};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

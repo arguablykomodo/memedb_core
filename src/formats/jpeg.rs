@@ -14,8 +14,8 @@ pub const MAGIC: &[u8] = b"\xFF\xD8";
 pub const OFFSET: usize = 0;
 
 use crate::{
-    utils::{read_stack, read_byte, read_heap},
     error::{Error, Result},
+    utils::{read_byte, read_heap, read_stack, skip},
     TagSet,
 };
 use std::io::{Read, Seek, Write};
@@ -35,7 +35,7 @@ fn read_marker(src: &mut (impl Read + Seek)) -> Result<u8> {
 
 fn skip_segment(src: &mut (impl Read + Seek)) -> Result<()> {
     let length = u16::from_be_bytes(read_stack::<2>(src)?).saturating_sub(2);
-    skip_bytes!(src, length as i64)?;
+    skip(src, length as i64)?;
     Ok(())
 }
 
@@ -51,7 +51,7 @@ fn skip_ecs(src: &mut (impl Read + Seek)) -> Result<u8> {
 }
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
-    skip_bytes!(src, MAGIC.len() as i64)?;
+    skip(src, MAGIC.len() as i64)?;
     let mut byte = read_marker(src)?;
     loop {
         match byte {
@@ -60,10 +60,10 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
             0xE4 => {
                 let length = u16::from_be_bytes(read_stack::<2>(src)?).saturating_sub(2) as usize;
                 if length < TAGS_ID.len() {
-                    skip_bytes!(src, length as i64)?;
+                    skip(src, length as i64)?;
                     byte = read_marker(src)?;
                 } else if read_heap(src, TAGS_ID.len())? != TAGS_ID {
-                    skip_bytes!(src, length.saturating_sub(TAGS_ID.len()) as i64)?;
+                    skip(src, length.saturating_sub(TAGS_ID.len()) as i64)?;
                     byte = read_marker(src)?;
                 } else {
                     let length = length.saturating_sub(TAGS_ID.len());
@@ -135,7 +135,7 @@ fn write_tags_segment(dest: &mut impl Write, tags: TagSet) -> Result<()> {
 }
 
 pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
-    skip_bytes!(src, MAGIC.len() as i64)?;
+    skip(src, MAGIC.len() as i64)?;
     dest.write_all(MAGIC)?;
     let mut tags = Some(tags);
     let mut byte = read_marker(src)?;

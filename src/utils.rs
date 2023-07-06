@@ -16,10 +16,9 @@ pub fn read_heap(src: &mut impl std::io::Read, n: usize) -> Result<Vec<u8>, std:
     Ok(bytes)
 }
 
-macro_rules! skip_bytes {
-    ($src:expr, $n:expr) => {
-        $src.seek(std::io::SeekFrom::Current($n))
-    };
+pub fn skip(src: &mut impl std::io::Seek, n: i64) -> Result<(), std::io::Error> {
+    src.seek(std::io::SeekFrom::Current(n))?;
+    Ok(())
 }
 
 #[cfg(test)]

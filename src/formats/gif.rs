@@ -35,8 +35,8 @@ pub const MAGIC: &[u8] = b"GIF89a";
 pub const OFFSET: usize = 0;
 
 use crate::{
-    utils::{read_stack,read_byte, read_heap},
     error::{Error, Result},
+    utils::{read_byte, read_heap, read_stack, skip},
     TagSet,
 };
 use std::io::{Read, Seek, Write};
@@ -49,7 +49,7 @@ fn skip_sub_blocks(src: &mut (impl Read + Seek)) -> Result<()> {
         if sub_block_length == 0 {
             return Ok(());
         } else {
-            skip_bytes!(src, sub_block_length as i64)?;
+            skip(src, sub_block_length as i64)?;
         }
     }
 }
@@ -121,10 +121,10 @@ fn get_section(src: &mut (impl Read + Seek)) -> Result<Section> {
 }
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
-    skip_bytes!(src, MAGIC.len() as i64)?;
+    skip(src, MAGIC.len() as i64)?;
     let logical_screen_descriptor = read_stack::<7>(src)?;
     let color_table_size = get_color_table_size(logical_screen_descriptor[4]);
-    skip_bytes!(src, color_table_size as i64)?;
+    skip(src, color_table_size as i64)?;
 
     loop {
         match get_section(src)? {
@@ -143,14 +143,14 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
             Application(_, _, _, _) | Comment(_, _) => skip_sub_blocks(src)?,
             GraphicsControl(_, _) | Plaintext(_, _) => {
                 let block_size = read_byte(src)?;
-                skip_bytes!(src, block_size as i64)?;
+                skip(src, block_size as i64)?;
                 skip_sub_blocks(src)?;
             }
             ImageDescriptor(_) => {
                 let data = read_stack::<9>(src)?;
                 let color_table_size = get_color_table_size(data[8]);
                 // Extra byte skipped is LZW Minimum Code Size, i dont know what it is and i dont care
-                skip_bytes!(src, color_table_size as i64 + 1)?;
+                skip(src, color_table_size as i64 + 1)?;
                 skip_sub_blocks(src)?;
             }
             Eof(_) => return Ok(TagSet::new()),
@@ -159,7 +159,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
 }
 
 pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
-    skip_bytes!(src, MAGIC.len() as i64)?;
+    skip(src, MAGIC.len() as i64)?;
     dest.write_all(MAGIC)?;
 
     let logical_screen_descriptor = read_stack::<7>(src)?;

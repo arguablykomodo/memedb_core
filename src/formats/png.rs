@@ -14,8 +14,8 @@ pub const MAGIC: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
 pub const OFFSET: usize = 0;
 
 use crate::{
-    utils::{read_stack, read_heap},
     error::{Error, Result},
+    utils::{read_heap, read_stack, skip},
     TagSet,
 };
 use std::io::{Read, Seek, Write};
@@ -26,7 +26,7 @@ const END_CHUNK: &[u8; 4] = b"IEND";
 const CRC: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_ISO_HDLC);
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
-    skip_bytes!(src, MAGIC.len() as i64)?;
+    skip(src, MAGIC.len() as i64)?;
     loop {
         let chunk_length = u32::from_be_bytes(read_stack::<4>(src)?);
         let chunk_type = read_stack::<4>(src)?;
@@ -55,14 +55,14 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
             }
             // We dont care about these, skip!
             _ => {
-                skip_bytes!(src, chunk_length as i64 + 4)?;
+                skip(src, chunk_length as i64 + 4)?;
             }
         }
     }
 }
 
 pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
-    skip_bytes!(src, MAGIC.len() as i64)?;
+    skip(src, MAGIC.len() as i64)?;
     dest.write_all(MAGIC)?;
 
     // The first chunk should always be IHDR, according to the spec, so we are going to read it manually
@@ -108,7 +108,7 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
         match &chunk_type {
             // Skip old tags
             TAG_CHUNK => {
-                skip_bytes!(src, chunk_length as i64 + 4)?;
+                skip(src, chunk_length as i64 + 4)?;
             }
             // Write rest of the file
             END_CHUNK => {

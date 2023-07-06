@@ -16,8 +16,8 @@ pub const MAGIC: &[u8] = b"RIFF";
 pub const OFFSET: usize = 0;
 
 use crate::{
-    utils::{read_stack, read_heap},
     error::{Error, Result},
+    utils::{read_heap, read_stack, skip},
     TagSet,
 };
 use std::io::{Read, Seek, Write};
@@ -25,9 +25,9 @@ use std::io::{Read, Seek, Write};
 const TAG_CHUNK: &[u8; 4] = b"meme";
 
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
-    skip_bytes!(src, MAGIC.len() as i64)?;
+    skip(src, MAGIC.len() as i64)?;
     let mut file_length = u32::from_le_bytes(read_stack::<4>(src)?);
-    skip_bytes!(src, 4)?;
+    skip(src, 4)?;
     file_length = file_length.checked_sub(4).ok_or(Error::InvalidRiffLength)?;
     while file_length > 0 {
         let name = read_stack::<4>(src)?;
@@ -42,9 +42,9 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
             }
             return Ok(tags);
         }
-        skip_bytes!(src, length as i64)?;
+        skip(src, length as i64)?;
         if (length & 1) == 1 {
-            skip_bytes!(src, 1)?;
+            skip(src, 1)?;
             file_length = file_length.checked_sub(1).ok_or(Error::InvalidRiffLength)?;
         }
         // Name + length + payload
@@ -55,7 +55,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
 }
 
 pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
-    skip_bytes!(src, MAGIC.len() as i64)?;
+    skip(src, MAGIC.len() as i64)?;
     dest.write_all(MAGIC)?;
 
     let mut file_length = u32::from_le_bytes(read_stack::<4>(src)?);
@@ -73,9 +73,9 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
         let chunk_length_bytes = read_stack::<4>(src)?;
         let chunk_length = u32::from_le_bytes(chunk_length_bytes);
         if &name == TAG_CHUNK {
-            skip_bytes!(src, chunk_length as i64)?;
+            skip(src, chunk_length as i64)?;
             if (chunk_length & 1) == 1 {
-                skip_bytes!(src, 1)?;
+                skip(src, 1)?;
                 file_length = file_length.checked_sub(1).ok_or(Error::InvalidRiffLength)?;
             }
         } else {
