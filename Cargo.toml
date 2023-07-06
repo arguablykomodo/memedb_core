@@ -15,11 +15,12 @@ edition = "2021"
 gitlab = { repository = "memedb/memedb_core" }
 
 [features]
-default = ["gif", "png", "riff", "jpeg"]
+default = ["gif", "png", "riff", "jpeg", "isobmff"]
 gif = []
 png = ["crc"]
 riff = []
 jpeg = []
+isobmff = []
 
 [dependencies]
 crc = { version = "3.0.0", optional = true }

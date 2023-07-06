@@ -13,3 +13,8 @@ extending media formats to add custom metadata.
   - AVI
   - ...
 - JPEG
+- ISO base media file format
+  - MP4
+  - JPEG 2000
+  - 3GP
+  - ...

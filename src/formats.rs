@@ -1,5 +1,7 @@
 #[cfg(feature = "gif")]
 mod gif;
+#[cfg(feature = "isobmff")]
+mod isobmff;
 #[cfg(feature = "jpeg")]
 mod jpeg;
 #[cfg(feature = "png")]
@@ -20,6 +22,8 @@ enum FormatTag {
     Riff,
     #[cfg(feature = "jpeg")]
     Jpeg,
+    #[cfg(feature = "isobmff")]
+    Isobmff,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -44,6 +48,8 @@ const FORMATS: &[Format] = &[
     Format::new(riff::MAGIC, riff::OFFSET, FormatTag::Riff),
     #[cfg(feature = "jpeg")]
     Format::new(jpeg::MAGIC, jpeg::OFFSET, FormatTag::Jpeg),
+    #[cfg(feature = "isobmff")]
+    Format::new(isobmff::MAGIC, isobmff::OFFSET, FormatTag::Isobmff),
 ];
 
 // Identifies the format for a file by succesively eliminating non-matching signatures until 1 remains.
@@ -84,6 +90,8 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>> {
             FormatTag::Riff => riff::read_tags(src)?,
             #[cfg(feature = "jpeg")]
             FormatTag::Jpeg => jpeg::read_tags(src)?,
+            #[cfg(feature = "isobmff")]
+            FormatTag::Isobmff => isobmff::read_tags(src)?,
         };
         Ok(Some(tags))
     } else {
@@ -107,6 +115,8 @@ pub fn write_tags(
             FormatTag::Riff => riff::write_tags(src, dest, tags)?,
             #[cfg(feature = "jpeg")]
             FormatTag::Jpeg => jpeg::write_tags(src, dest, tags)?,
+            #[cfg(feature = "isobmff")]
+            FormatTag::Isobmff => isobmff::write_tags(src, dest, tags)?,
         };
         Ok(Some(()))
     } else {
