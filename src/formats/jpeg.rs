@@ -1,14 +1,31 @@
-// JPEG files are made out of segments that start with 0xFF followed by a marker indicating what
-// kind of segment it is. Variable length segments also have 2 more bytes indicating the length.
-// Some segments are followed by entropy encoded data, that have to be read byte by byte until a
-// 0xFF byte is found that *isn't* followed by 0x00.
-//
-// Related links:
-// https://en.wikipedia.org/wiki/JPEG_File_Interchange_Format
-// https://en.wikipedia.org/wiki/JPEG#Syntax_and_structure
-// https://www.w3.org/Graphics/JPEG/itu-t81.pdf
-// https://www.w3.org/Graphics/JPEG/jpeg3.pdf
-// https://www.media.mit.edu/pia/Research/deepview/exif.html
+//! # Joint Photographic Experts Group
+//!
+//! JPEG data is organized in segments. Segments start with a `0xFF` byte, and a second byte
+//! indicating the type of the segment. Depending on this type three things can happen:
+//!
+//! 1. The segment is zero-sized, and ends right there.
+//! 2. The segment is variable sized, in which case there will be a two byte big endian length
+//!    indicator (including the length itself) followed by the segment data.
+//! 3. The segment is entropy-coded, and must be slogged through byte by byte until a 0xFF is found
+//!    that *isn't* followed by `0x00`, which marks the end of the segment.
+//!
+//! A JPEG file consists of a list of segments, with several constraints on their order, the
+//! relevant for our case being:
+//!
+//! - The first segment must be `SOI`.
+//! - On JFIF files, the second segment must be `APP0` with the id `JFIF`.
+//! - On Exif files, the second segment must be `APP1` with the id `Exif`.
+//! - The last segment must be `EOI`.
+//!
+//! MemeDB stores its tags in an `APP4` segment with the id `MemeDB`.
+//!
+//! ## Relevant Links
+//!
+//! - [Wikipedia article for JPEG](https://en.wikipedia.org/wiki/JPEG)
+//! - [Wikipedia article for JFIF](https://en.wikipedia.org/wiki/JPEG_File_Interchange_Format)
+//! - [The JPEG specification](https://www.w3.org/Graphics/JPEG/itu-t81.pdf)
+//! - [The JFIF specification](https://www.w3.org/Graphics/JPEG/jfif3.pdf)
+//! - [A description of the Exif file format](https://www.media.mit.edu/pia/Research/deepview/exif.html)
 
 pub(crate) const MAGIC: &[u8] = b"\xFF\xD8";
 pub(crate) const OFFSET: usize = 0;
@@ -49,6 +66,7 @@ fn skip_ecs(src: &mut (impl Read + Seek)) -> Result<u8, Error> {
     }
 }
 
+/// Given a `src`, return the tags contained inside.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     skip(src, MAGIC.len() as i64)?;
     let mut byte = read_marker(src)?;
@@ -133,6 +151,9 @@ fn write_tags_segment(dest: &mut impl Write, tags: TagSet) -> Result<(), Error> 
     Ok(())
 }
 
+/// Read data from `src`, set the provided `tags`, and write to `dest`.
+///
+/// This function will remove any tags that previously existed in `src`.
 pub fn write_tags(
     src: &mut (impl Read + Seek),
     dest: &mut impl Write,

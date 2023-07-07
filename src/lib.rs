@@ -1,6 +1,11 @@
-//! This crate provides functions to read and write a set of strings to various media file formats.
+//! # MemeDB
 //!
-//! It has been mainly designed for the categorization of memes.
+//! A Rust library for reading and writing tags to media streams.
+//!
+//! The library exposes the general purpose [`read_tags`][crate::read_tags] and
+//! [`write_tags`][crate::read_tags] functions, which try to heuristically detect the format of the
+//! source. For more specific use cases, each module in the library exposes specific `read_tags`
+//! and `write_tags` functions for each format.
 
 #[cfg(not(any(
     feature = "gif",
@@ -22,19 +27,10 @@ use std::io::{Read, Seek, Write};
 type TagSet = std::collections::HashSet<String>;
 
 /// Utility macro for quickly creating tagsets.
+///
 /// ```
-/// # use std::collections::HashSet;
 /// # use memedb_core::tagset;
-/// // Creating tagsets the old-fashioned way is such a chore
-/// let mut tagset_a = HashSet::new();
-/// tagset_a.insert(String::from("foo"));
-/// tagset_a.insert(String::from("bar"));
-///
-/// // But using the macro makes it a breeze!
-/// let tagset_b = tagset!{ "foo", "bar" };
-///
-/// // And provides the same results!
-/// assert_eq!(tagset_a, tagset_b);
+/// let tagset = tagset!{ "foo", "bar" };
 /// ```
 #[macro_export]
 macro_rules! tagset {
@@ -54,7 +50,7 @@ macro_rules! tagset {
 /// - The tag cannot have a size higher than 256 bytes.
 ///
 /// When writing tags, the library will call this function automatically and return an error if
-/// appropiate.
+/// appropriate.
 pub fn is_tag_valid(tag: impl AsRef<str>) -> bool {
     !(tag.as_ref().is_empty() || tag.as_ref().len() > 0xFF)
 }
@@ -67,13 +63,9 @@ pub fn are_tags_valid(tags: &TagSet) -> bool {
 }
 
 /// Given a `src`, return the tags (if any) contained inside.
-/// ```no_run
-/// # use std::fs::File;
-/// # use memedb_core::{read_tags};
-/// let tags = read_tags(&mut File::open("foo.png")?);
-/// # Ok::<(), std::io::Error>(())
-/// ```
-/// In the case that the format is unrecognized, the function will return None.
+///
+/// This function operates by first calling [`identify_format`](crate::identify_format), and then
+/// calling the corresponding `read_tags` function if successful.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>, Error> {
     if let Some(format) = identify_format(src)? {
         src.seek(std::io::SeekFrom::Start(0))?;
@@ -96,15 +88,11 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>, Error> 
 }
 
 /// Read data from `src`, set the provided `tags`, and write to `dest`
-/// ```no_run
-/// # use std::{fs::File};
-/// # use memedb_core::{write_tags, tagset};
-/// write_tags(&mut File::open("bar.png")?, &mut File::create("bar2.png")?, tagset! { "foo" });
-/// # Ok::<(), std::io::Error>(())
-/// ```
+///
 /// This function will remove any tags that previously existed in the source.
 ///
-/// In the case that the format is unrecognized, the function will return None.
+/// This function operates by first calling [`identify_format`](crate::identify_format), and then
+/// calling the corresponding `write_tags` function if successful.
 pub fn write_tags(
     src: &mut (impl Read + Seek),
     dest: &mut impl Write,

@@ -1,8 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-/// A possible error returned by the [`read_tags`][crate::read_tags] or
-/// [`write_tags`][crate::write_tags] functions.
+/// A possible error returned by a `read_tags` or `write_tags` function.
 pub enum Error {
     /// The tags provided are invalid (check the documentation of
     /// [`is_tag_valid`][crate::is_tag_valid] for more information)

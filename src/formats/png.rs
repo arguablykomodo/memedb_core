@@ -1,14 +1,22 @@
-// PNG data is stored in chunks: Each chunk starts with a 4 byte big endian number describing the
-// length of the data within. After that there's a 4 byte ASCII identifier for the chunk type.
-// Then comes the data, which is as long as the length described. At the end there is a CRC-32
-// checksum of the chunk type and data. An IEND chunk marks the end of the file.
-//
-// we store tags in the `meMe` chunk. The tags are encoded by a byte storing the length of the tag,
-// followed by the UTF-8 encoded bytes.
-//
-// Related links:
-// http://www.libpng.org/pub/png/apps/pngcheck.html
-// https://en.wikipedia.org/wiki/Portable_Network_Graphics
+//! # Portable Network Graphics
+//!
+//! PNG data is organized in chunks. Each chunk is structured as follows:
+//!
+//! - 4 byte big endian number describing the length of the data within.
+//! - 4 byte ASCII identifier for the chunk type.
+//! - The chunk data itself, which is as long as described in the length field.
+//! - 4 byte CRC-32 checksum of the chunk type and data.
+//!
+//! A PNG file starts with a magic number to identify itself, followed by a series of chunks, the
+//! first of which must be `IHDR`, and the last of which must be `IEND`.
+//!
+//! MemeDB stores its tags in a `meMe` chunk.
+//!
+//! ## Relevant Links
+//!
+//! - [Wikipedia article for PNG](https://en.wikipedia.org/wiki/Portable_Network_Graphics)
+//! - [The PNG specification](https://www.w3.org/TR/2003/REC-PNG-20031110/)
+//! - [`pngcheck`, a program to analyze PNG files](http://www.libpng.org/pub/png/apps/pngcheck.html)
 
 pub(crate) const MAGIC: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
 pub(crate) const OFFSET: usize = 0;
@@ -24,6 +32,7 @@ const END_CHUNK: &[u8; 4] = b"IEND";
 
 const CRC: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_ISO_HDLC);
 
+/// Given a `src`, return the tags contained inside.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     skip(src, MAGIC.len() as i64)?;
     loop {
@@ -60,6 +69,9 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     }
 }
 
+/// Read data from `src`, set the provided `tags`, and write to `dest`.
+///
+/// This function will remove any tags that previously existed in `src`.
 pub fn write_tags(
     src: &mut (impl Read + Seek),
     dest: &mut impl Write,

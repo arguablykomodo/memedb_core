@@ -9,22 +9,25 @@ pub mod png;
 #[cfg(feature = "riff")]
 pub mod riff;
 
-use crate::{
-    utils::{read_byte, read_heap},
-    Error,
-};
+use crate::utils::{read_byte, read_heap};
 use std::io::Read;
 
+/// One of the possible formats identified by [`identify_format`][crate::identify_format].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Format {
+    /// [Graphics Interchange Format][crate::gif].
     #[cfg(feature = "gif")]
     Gif,
+    /// [ISO Base Media File Format][crate::isobmff].
     #[cfg(feature = "isobmff")]
     Isobmff,
+    /// [Joint Photographic Experts Group][crate::jpeg].
     #[cfg(feature = "jpeg")]
     Jpeg,
+    /// [Portable Network Graphics][crate::png].
     #[cfg(feature = "png")]
     Png,
+    /// [Resource Interchange File Format][crate::riff].
     #[cfg(feature = "riff")]
     Riff,
 }
@@ -55,8 +58,13 @@ const FORMATS: &[FormatInfo] = &[
     FormatInfo::new(riff::MAGIC, riff::OFFSET, Format::Riff),
 ];
 
-// Identifies the format for a file by succesively eliminating non-matching signatures until 1 remains.
-pub fn identify_format(src: &mut impl Read) -> Result<Option<Format>, Error> {
+/// Attempts to identify the format of a given `src`.
+///
+/// The function operates based on a list of known "magic numbers" that can be found near the
+/// beginning of most file formats.
+///
+/// If no known format can be identified, `None` will be returned.
+pub fn identify_format(src: &mut impl Read) -> Result<Option<Format>, std::io::Error> {
     let mut active = Vec::new();
     let mut next = FORMATS.to_vec();
     let mut i = 0;

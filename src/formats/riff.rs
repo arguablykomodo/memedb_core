@@ -1,16 +1,22 @@
-// RIFF data is stored in chunks: Each chunk has a 4-byte ASCII name, a 4-byte little endian
-// length, and then a payload (plus an extra padding byte if the length is not even). The file is
-// composed of a single `RIFF` meta-chunk, that contains a 4-byte ASCII name describing the format
-// of the payload (`WEBP`, `AVI `, `WAV `, etc), and then a series of subchunks.
-//
-// we store tags in the `meme` chunk. The tags are encoded by a byte storing the length of the tag,
-// followed by the UTF-8 encoded bytes.
-//
-// Related links:
-// https://en.wikipedia.org/wiki/Interchange_File_Format
-
-// Cool fact: I actually wrote a 400-word rant on how much i hated this format but turns out i
-// actually didnt understand how it worked so nevermind all that.
+//! # Resource Interchange File Format
+//!
+//! RIFF data is organized in chunks. Each chunk is structured as follows:
+//!
+//! - 4 byte ASCII name.
+//! - 4 byte little endian length.
+//! - The chunk data itself.
+//! - An extra padding byte if the length is not even.
+//!
+//! A RIFF file is composed of a single `RIFF` meta-chunk, that contains a 4-byte ASCII name
+//! describing the format of the payload (`WEBP`, `AVI `, `WAV `, etc), and then a series of
+//! sub-chunks.
+//!
+//! MemeDB stores its tags in a `meme` chunk.
+//!
+//! ## Relevant Links
+//!
+//! - [Wikipedia article for RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format)
+//! - [WebP Container Specification](https://developers.google.com/speed/webp/docs/riff_container)
 
 pub(crate) const MAGIC: &[u8] = b"RIFF";
 pub(crate) const OFFSET: usize = 0;
@@ -23,6 +29,7 @@ use std::io::{Read, Seek, Write};
 
 const TAG_CHUNK: &[u8; 4] = b"meme";
 
+/// Given a `src`, return the tags contained inside.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     skip(src, MAGIC.len() as i64)?;
     let mut file_length = u32::from_le_bytes(read_stack::<4>(src)?);
@@ -53,6 +60,9 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     Ok(TagSet::new())
 }
 
+/// Read data from `src`, set the provided `tags`, and write to `dest`.
+///
+/// This function will remove any tags that previously existed in `src`.
 pub fn write_tags(
     src: &mut (impl Read + Seek),
     dest: &mut impl Write,

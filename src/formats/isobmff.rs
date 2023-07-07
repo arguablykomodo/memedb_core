@@ -1,3 +1,24 @@
+//! # ISO Base Media File Format
+//!
+//! ISOBMFF data is organized in boxes. Each box is structured as follows:
+//!
+//! - 4 byte big-endian number describing the length of the data within.
+//! - 4 byte identifier for the box type.
+//! - if the size is 1, then the size is actually stored in the next 8 bytes.
+//! - if the size is 0, then the box lasts until the end of the file.
+//! - if the type is `uuid`, then the box type is actually stored in the next 12 bytes.
+//! - The box data itself, which may consist of other boxes.
+//!
+//! An ISOBMFF file consists of a series of boxes, the first of which must be of the type `ftyp`.
+//!
+//! MemeDB stores its tags in a `uuid` box with the UUID `12EBC64DEA6247A08E92B9FB3B518C28`. The
+//! box is placed at the end of the file since boxes can reference data via byte offset.
+//!
+//! ## Relevant Links
+//!
+//! - [Wikipedia article for ISOBMFF](https://en.wikipedia.org/wiki/ISO_base_media_file_format)
+//! - [ISO/IEC 14496-12 standard](https://www.iso.org/standard/83102.html)
+
 pub(crate) const MAGIC: &[u8] = b"ftyp";
 pub(crate) const OFFSET: usize = 4;
 
@@ -87,6 +108,7 @@ impl Box {
     }
 }
 
+/// Given a `src`, return the tags contained inside.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     while let Some(r#box) = Box::read(src).map_or_else(
         |e| if e.kind() == std::io::ErrorKind::UnexpectedEof { Ok(None) } else { Err(e) },
@@ -112,6 +134,9 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     Ok(TagSet::new())
 }
 
+/// Read data from `src`, set the provided `tags`, and write to `dest`.
+///
+/// This function will remove any tags that previously existed in `src`.
 pub fn write_tags(
     src: &mut (impl Read + Seek),
     dest: &mut impl Write,

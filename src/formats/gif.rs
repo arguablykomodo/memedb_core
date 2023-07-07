@@ -1,35 +1,28 @@
-// Incomprehensible TL;DR is as follows:
-//   Logical Screen Descriptor: 7 bytes
-//     5th byte is a packed byte:
-//       1st bit: global color table flag (0=no table)
-//       last 3 bits: global color table size ($S)
-//   Optional Global Color Table (marked by flag in Logical Screen Descriptor): 3*2^($S+1) bytes
-//   Sub-blocks: [$N, $N bytes] <- repeat until $N == 0
-//   Graphics Control Extension: 0x21, 0xF9, $N, $N bytes, then sub-blocks
-//   Image Descriptor: 0x2C, 8 bytes, packed byte:
-//     1st bit: local color table flag (0=no table)
-//     last 3 bits: local color table size ($S)
-//   Optional Local Color Table (marked by flag in Image Descriptor): 3*2^($S+1) bytes
-//   Image Data: 1 byte plus sub-blocks
-//   Plaintext Extension: 0x21, 0x01, $N, $N bytes, then sub-blocks
-//   Application Extension: 0x21, 0xFF, $N(0x0B), $N bytes, then sub-blocks
-//   Comment Extension: 0x21, 0xFE, then sub-blocks
-//   Trailer: 0x3B, EOF
-//
-// Layout:
-//   Logical Screen Descriptor ~ Global Color Table? ~ (
-//     Application Extension |
-//     Comment Extension |
-//     (Graphics Control Extension? ~ (
-//       (Image Descriptor ~ Local Color Table? ~ Image Data) |
-//       Plaintext Extension
-//     ))
-//   )* ~ Trailer
-//
-// tags are stored as sub-blocks inside an Application Extension with the label MEMETAGS1.0
-//
-// Related links:
-// https://www.matthewflickinger.com/lab/whatsinagif/bits_and_bytes.asp
+//! # Graphics Interchange Format
+//!
+//! GIF files are organized as a sequence of descriptors, extensions, and data, with varying types
+//! and encodings:
+//!
+//! - A Logical Screen Descriptor must be at the beginning of the file, it has a fixed sized and
+//! may be followed by an optional color table.
+//! - Extensions are identified by a `0x21` byte, followed by a label byte and a length byte.
+//! - Image Descriptors have a fixed size and are followed by an optional color table and image
+//! data.
+//! - Variable sized data (like the one found after extensions and in image data) is stored in
+//! sub-blocks, which indicate their sized in a single byte, followed by the data. A sequence of
+//! sub-blocks ends when a sub-block of size 0 is found.
+//! - The file ends when a trailer byte is found (`0x3B`)
+//!
+//! GIF files start with a fixed-length header (`GIF87a` or `GIF89a`) marking which version of the
+//! spec is used. This library only handles the `GIF89a` spec.
+//!
+//! MemeDB stores its tags in an Application Extension with the label `MEMETAGS1.0`.
+//!
+//! ## Related Links
+//!
+//! - [Wikipedia article for GIF](https://en.wikipedia.org/wiki/GIF)
+//! - [GIF Specification](https://www.w3.org/Graphics/GIF/spec-gif89a.txt)
+//! - [Matthew Flickinger's "What's In A GIF"](https://www.matthewflickinger.com/lab/whatsinagif/)
 
 pub(crate) const MAGIC: &[u8] = b"GIF89a";
 pub(crate) const OFFSET: usize = 0;
@@ -119,6 +112,7 @@ fn get_section(src: &mut (impl Read + Seek)) -> Result<Section, Error> {
     })
 }
 
+/// Given a `src`, return the tags contained inside.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     skip(src, MAGIC.len() as i64)?;
     let logical_screen_descriptor = read_stack::<7>(src)?;
@@ -157,6 +151,9 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     }
 }
 
+/// Read data from `src`, set the provided `tags`, and write to `dest`.
+///
+/// This function will remove any tags that previously existed in `src`.
 pub fn write_tags(
     src: &mut (impl Read + Seek),
     dest: &mut impl Write,
