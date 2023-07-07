@@ -31,8 +31,8 @@
 // Related links:
 // https://www.matthewflickinger.com/lab/whatsinagif/bits_and_bytes.asp
 
-pub const MAGIC: &[u8] = b"GIF89a";
-pub const OFFSET: usize = 0;
+pub(crate) const MAGIC: &[u8] = b"GIF89a";
+pub(crate) const OFFSET: usize = 0;
 
 use crate::{
     utils::{read_byte, read_heap, read_stack, skip},

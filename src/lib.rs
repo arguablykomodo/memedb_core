@@ -16,6 +16,7 @@ mod formats;
 mod utils;
 
 pub use error::Error;
+pub use formats::*;
 use std::io::{Read, Seek, Write};
 
 type TagSet = std::collections::HashSet<String>;
@@ -74,7 +75,24 @@ pub fn are_tags_valid(tags: &TagSet) -> bool {
 /// ```
 /// In the case that the format is unrecognized, the function will return None.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>, Error> {
-    formats::read_tags(src)
+    if let Some(format) = identify_format(src)? {
+        src.seek(std::io::SeekFrom::Start(0))?;
+        let tags = match format {
+            #[cfg(feature = "gif")]
+            Format::Gif => gif::read_tags(src)?,
+            #[cfg(feature = "isobmff")]
+            Format::Isobmff => isobmff::read_tags(src)?,
+            #[cfg(feature = "jpeg")]
+            Format::Jpeg => jpeg::read_tags(src)?,
+            #[cfg(feature = "png")]
+            Format::Png => png::read_tags(src)?,
+            #[cfg(feature = "riff")]
+            Format::Riff => riff::read_tags(src)?,
+        };
+        Ok(Some(tags))
+    } else {
+        Ok(None)
+    }
 }
 
 /// Read data from `src`, set the provided `tags`, and write to `dest`
@@ -93,7 +111,24 @@ pub fn write_tags(
     tags: TagSet,
 ) -> Result<Option<()>, Error> {
     if are_tags_valid(&tags) {
-        formats::write_tags(src, dest, tags)
+        if let Some(format) = identify_format(src)? {
+            src.seek(std::io::SeekFrom::Start(0))?;
+            match format {
+                #[cfg(feature = "gif")]
+                Format::Gif => gif::write_tags(src, dest, tags)?,
+                #[cfg(feature = "isobmff")]
+                Format::Isobmff => isobmff::write_tags(src, dest, tags)?,
+                #[cfg(feature = "jpeg")]
+                Format::Jpeg => jpeg::write_tags(src, dest, tags)?,
+                #[cfg(feature = "png")]
+                Format::Png => png::write_tags(src, dest, tags)?,
+                #[cfg(feature = "riff")]
+                Format::Riff => riff::write_tags(src, dest, tags)?,
+            };
+            Ok(Some(()))
+        } else {
+            Ok(None)
+        }
     } else {
         Err(error::Error::InvalidTags)
     }

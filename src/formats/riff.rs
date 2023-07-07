@@ -12,8 +12,8 @@
 // Cool fact: I actually wrote a 400-word rant on how much i hated this format but turns out i
 // actually didnt understand how it worked so nevermind all that.
 
-pub const MAGIC: &[u8] = b"RIFF";
-pub const OFFSET: usize = 0;
+pub(crate) const MAGIC: &[u8] = b"RIFF";
+pub(crate) const OFFSET: usize = 0;
 
 use crate::{
     utils::{read_heap, read_stack, skip},

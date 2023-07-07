@@ -1,22 +1,22 @@
 #[cfg(feature = "gif")]
-mod gif;
+pub mod gif;
 #[cfg(feature = "isobmff")]
-mod isobmff;
+pub mod isobmff;
 #[cfg(feature = "jpeg")]
-mod jpeg;
+pub mod jpeg;
 #[cfg(feature = "png")]
-mod png;
+pub mod png;
 #[cfg(feature = "riff")]
-mod riff;
+pub mod riff;
 
 use crate::{
     utils::{read_byte, read_heap},
-    Error, TagSet,
+    Error,
 };
-use std::io::{Read, Seek, Write};
+use std::io::Read;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum FormatTag {
+pub enum Format {
     #[cfg(feature = "gif")]
     Gif,
     #[cfg(feature = "isobmff")]
@@ -30,33 +30,33 @@ enum FormatTag {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct Format {
+struct FormatInfo {
     magic: &'static [u8],
     offset: usize,
-    tag: FormatTag,
+    format: Format,
 }
 
-impl Format {
-    const fn new(magic: &'static [u8], offset: usize, tag: FormatTag) -> Self {
-        Self { magic, offset, tag }
+impl FormatInfo {
+    const fn new(magic: &'static [u8], offset: usize, format: Format) -> Self {
+        Self { magic, offset, format }
     }
 }
 
-const FORMATS: &[Format] = &[
+const FORMATS: &[FormatInfo] = &[
     #[cfg(feature = "gif")]
-    Format::new(gif::MAGIC, gif::OFFSET, FormatTag::Gif),
+    FormatInfo::new(gif::MAGIC, gif::OFFSET, Format::Gif),
     #[cfg(feature = "isobmff")]
-    Format::new(isobmff::MAGIC, isobmff::OFFSET, FormatTag::Isobmff),
+    FormatInfo::new(isobmff::MAGIC, isobmff::OFFSET, Format::Isobmff),
     #[cfg(feature = "jpeg")]
-    Format::new(jpeg::MAGIC, jpeg::OFFSET, FormatTag::Jpeg),
+    FormatInfo::new(jpeg::MAGIC, jpeg::OFFSET, Format::Jpeg),
     #[cfg(feature = "png")]
-    Format::new(png::MAGIC, png::OFFSET, FormatTag::Png),
+    FormatInfo::new(png::MAGIC, png::OFFSET, Format::Png),
     #[cfg(feature = "riff")]
-    Format::new(riff::MAGIC, riff::OFFSET, FormatTag::Riff),
+    FormatInfo::new(riff::MAGIC, riff::OFFSET, Format::Riff),
 ];
 
 // Identifies the format for a file by succesively eliminating non-matching signatures until 1 remains.
-fn identify_format(src: &mut impl Read) -> Result<Option<FormatTag>, Error> {
+pub fn identify_format(src: &mut impl Read) -> Result<Option<Format>, Error> {
     let mut active = Vec::new();
     let mut next = FORMATS.to_vec();
     let mut i = 0;
@@ -70,61 +70,15 @@ fn identify_format(src: &mut impl Read) -> Result<Option<FormatTag>, Error> {
         i += 1;
         match active.len() {
             1 => {
-                let Format { magic, offset, tag } = active[0];
+                let FormatInfo { magic, offset, format } = active[0];
                 let rest = read_heap(src, magic.len() + offset - i)?;
-                return Ok((rest == magic[i - offset..]).then_some(tag));
+                return Ok((rest == magic[i - offset..]).then_some(format));
             }
             0 if next.is_empty() => return Ok(None), // TODO: skip useless bytes
             _ => continue,
         }
     }
     Ok(None)
-}
-
-pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>, Error> {
-    if let Some(format) = identify_format(src)? {
-        src.seek(std::io::SeekFrom::Start(0))?;
-        let tags = match format {
-            #[cfg(feature = "gif")]
-            FormatTag::Gif => gif::read_tags(src)?,
-            #[cfg(feature = "isobmff")]
-            FormatTag::Isobmff => isobmff::read_tags(src)?,
-            #[cfg(feature = "jpeg")]
-            FormatTag::Jpeg => jpeg::read_tags(src)?,
-            #[cfg(feature = "png")]
-            FormatTag::Png => png::read_tags(src)?,
-            #[cfg(feature = "riff")]
-            FormatTag::Riff => riff::read_tags(src)?,
-        };
-        Ok(Some(tags))
-    } else {
-        Ok(None)
-    }
-}
-
-pub fn write_tags(
-    src: &mut (impl Read + Seek),
-    dest: &mut impl Write,
-    tags: TagSet,
-) -> Result<Option<()>, Error> {
-    if let Some(format) = identify_format(src)? {
-        src.seek(std::io::SeekFrom::Start(0))?;
-        match format {
-            #[cfg(feature = "gif")]
-            FormatTag::Gif => gif::write_tags(src, dest, tags)?,
-            #[cfg(feature = "isobmff")]
-            FormatTag::Isobmff => isobmff::write_tags(src, dest, tags)?,
-            #[cfg(feature = "jpeg")]
-            FormatTag::Jpeg => jpeg::write_tags(src, dest, tags)?,
-            #[cfg(feature = "png")]
-            FormatTag::Png => png::write_tags(src, dest, tags)?,
-            #[cfg(feature = "riff")]
-            FormatTag::Riff => riff::write_tags(src, dest, tags)?,
-        };
-        Ok(Some(()))
-    } else {
-        Ok(None)
-    }
 }
 
 #[cfg(test)]
@@ -136,7 +90,7 @@ mod tests {
         for format in FORMATS {
             let mut bytes = vec![0; format.offset];
             bytes.extend_from_slice(format.magic);
-            assert_eq!(identify_format(&mut &bytes[..]).unwrap(), Some(format.tag));
+            assert_eq!(identify_format(&mut &bytes[..]).unwrap(), Some(format.format));
         }
     }
 

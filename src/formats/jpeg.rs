@@ -10,8 +10,8 @@
 // https://www.w3.org/Graphics/JPEG/jpeg3.pdf
 // https://www.media.mit.edu/pia/Research/deepview/exif.html
 
-pub const MAGIC: &[u8] = b"\xFF\xD8";
-pub const OFFSET: usize = 0;
+pub(crate) const MAGIC: &[u8] = b"\xFF\xD8";
+pub(crate) const OFFSET: usize = 0;
 
 use crate::{
     utils::{read_byte, read_heap, read_stack, skip},

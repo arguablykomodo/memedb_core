@@ -10,8 +10,8 @@
 // http://www.libpng.org/pub/png/apps/pngcheck.html
 // https://en.wikipedia.org/wiki/Portable_Network_Graphics
 
-pub const MAGIC: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
-pub const OFFSET: usize = 0;
+pub(crate) const MAGIC: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
+pub(crate) const OFFSET: usize = 0;
 
 use crate::{
     utils::{read_heap, read_stack, skip},

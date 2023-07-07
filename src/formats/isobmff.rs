@@ -1,5 +1,5 @@
-pub const MAGIC: &[u8] = b"ftyp";
-pub const OFFSET: usize = 4;
+pub(crate) const MAGIC: &[u8] = b"ftyp";
+pub(crate) const OFFSET: usize = 4;
 
 use crate::{
     utils::{read_heap, read_stack, skip},
@@ -7,8 +7,7 @@ use crate::{
 };
 use std::io::{Read, Seek, Write};
 
-pub const MEMEDB_UUID: [u8; 16] =
-    *b"\x12\xeb\xc6\x4d\xea\x62\x47\xa0\x8e\x92\xb9\xfb\x3b\x51\x8c\x28";
+const MEMEDB_UUID: [u8; 16] = *b"\x12\xeb\xc6\x4d\xea\x62\x47\xa0\x8e\x92\xb9\xfb\x3b\x51\x8c\x28";
 
 #[derive(Debug)]
 enum Size {
