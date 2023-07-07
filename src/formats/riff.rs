@@ -126,5 +126,4 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
     Ok(())
 }
 
-#[cfg(test)]
-make_tests! {"webp"}
+crate::utils::standard_tests!("webp");

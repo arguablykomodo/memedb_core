@@ -21,48 +21,47 @@ pub fn skip(src: &mut impl std::io::Seek, n: i64) -> Result<(), std::io::Error> 
     Ok(())
 }
 
-#[cfg(test)]
-macro_rules! test_file {
-    ($name:literal, $ext:literal) => {
-        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/media/", $name, ".", $ext))
-    };
-}
-
-#[cfg(test)]
-macro_rules! make_tests {
-    ($ext:literal) => {
-        mod tests {
-            use super::*;
-            use crate::tagset;
+macro_rules! standard_tests {
+    ($e:literal) => {
+        #[cfg(test)]
+        mod standard_tests {
+            use super::{read_tags, write_tags};
+            use crate::{tagset, TagSet};
             use quickcheck_macros::quickcheck;
-            use std::io::Cursor;
+            use std::io::{Cursor, Read, Seek};
 
-            const UNTAGGED: &[u8] = test_file!("minimal", $ext);
-            const EMPTY: &[u8] = test_file!("minimal_empty", $ext);
-            const TAGGED: &[u8] = test_file!("minimal_tagged", $ext);
-            const LARGE: &[u8] = test_file!("large", $ext);
+            const UNTAGGED: &[u8] = include_bytes!(concat!("../../tests/media/minimal.", $e));
+            const EMPTY: &[u8] = include_bytes!(concat!("../../tests/media/minimal_empty.", $e));
+            const TAGGED: &[u8] = include_bytes!(concat!("../../tests/media/minimal_tagged.", $e));
+            const LARGE: &[u8] = include_bytes!(concat!("../../tests/media/large.", $e));
+
+            fn write(src: &mut (impl Read + Seek), tags: TagSet) -> Vec<u8> {
+                let mut buf = Vec::new();
+                write_tags(src, &mut buf, tags).unwrap();
+                buf
+            }
 
             #[test]
             fn untagged() {
-                assert_read!(UNTAGGED, tagset! {});
-                assert_write!(UNTAGGED, tagset! { "foo", "bar" }, TAGGED);
+                assert_eq!(read_tags(&mut Cursor::new(&UNTAGGED)).unwrap(), tagset! {});
+                assert_eq!(write(&mut Cursor::new(&UNTAGGED), tagset! { "foo", "bar" }), TAGGED);
             }
 
             #[test]
             fn empty() {
-                assert_read!(EMPTY, tagset! {});
-                assert_write!(EMPTY, tagset! { "foo", "bar" }, TAGGED);
+                assert_eq!(read_tags(&mut Cursor::new(&EMPTY)).unwrap(), tagset! {});
+                assert_eq!(write(&mut Cursor::new(&EMPTY), tagset! { "foo", "bar" }), TAGGED);
             }
 
             #[test]
             fn tagged() {
-                assert_read!(TAGGED, tagset! { "foo", "bar" });
-                assert_write!(TAGGED, tagset! {}, EMPTY);
+                assert_eq!(read_tags(&mut Cursor::new(&TAGGED)).unwrap(), tagset! { "foo", "bar" });
+                assert_eq!(write(&mut Cursor::new(&TAGGED), tagset! {}), EMPTY);
             }
 
             #[test]
             fn large() {
-                assert_read!(LARGE, tagset! {});
+                assert_eq!(read_tags(&mut Cursor::new(&LARGE)).unwrap(), tagset! {});
             }
 
             #[quickcheck]
@@ -94,66 +93,4 @@ macro_rules! make_tests {
     };
 }
 
-#[cfg(test)]
-macro_rules! assert_read {
-    ($bytes:expr, $tags:expr) => {
-        let mut cursor = std::io::Cursor::new($bytes);
-        assert_eq!(read_tags(&mut cursor).unwrap(), $tags);
-    };
-}
-
-// Mix of ascii and unicode control pictures
-#[cfg(test)]
-#[rustfmt::skip]
-const MAPPINGS: [&str; 256] = [
-    "␀","␁","␂","␃","␄","␅","␆","␇","␈","␉","␊","␋","␌","␍","␎","␏",
-    "␐","␑","␒","␓","␔","␕","␖","␗","␘","␙","␚","␛","␜","␝","␞","␟",
-    " ","!","\"","#","$","%","&","'","(",")","*","+",",","-",".","/",
-    "0","1","2","3","4","5","6","7","8","9",":",";","<","=",">","?",
-    "@","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O",
-    "P","Q","R","S","T","U","V","W","X","Y","Z","[","\\","]","^","_",
-    "`","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o",
-    "p","q","r","s","t","u","v","w","x","y","z","{","|","}","~","␡",
-    "Ç","ü","é","â","ä","à","å","ç","ê","ë","è","ï","î","ì","Ä","Å",
-    "É","æ","Æ","ô","ö","ò","û","ù","ÿ","Ö","Ü","ø","£","Ø","×","ƒ",
-    "á","í","ó","ú","ñ","Ñ","ª","º","¿","®","¬","½","¼","¡","«","»",
-    "░","▒","▓","│","┤","Á","Â","À","©","╣","║","╗","╝","¢","¥","┐",
-    "└","┴","┬","├","─","┼","ã","Ã","╚","╔","╩","╦","╠","═","╬","¤",
-    "ð","Ð","Ê","Ë","È","ı","Í","Î","Ï","┘","┌","█","▄","¦","Ì","▀",
-    "Ó","ß","Ô","Ò","õ","Õ","µ","þ","Þ","Ú","Û","Ù","ý","Ý","¯","´",
-    "¬","±","‗","¾","¶","§","÷","¸","°","¨","•","¹","³","²","■","␣",
-];
-
-#[cfg(test)]
-pub(crate) fn hexdump(bytes: &[u8]) -> String {
-    bytes
-        .chunks(16)
-        .enumerate()
-        .map(|(i, c)| {
-            format!(
-                "{:07X}: {:48}  {}",
-                i * 16,
-                c.chunks(8)
-                    .map(|c| c.iter().map(|b| format!("{:02X}", b)).collect::<Vec<_>>().join(" "))
-                    .collect::<Vec<_>>()
-                    .join("  "),
-                c.iter().map(|&c| MAPPINGS[c as usize]).collect::<Vec<_>>().join("")
-            )
-        })
-        .fold(String::new(), |s, l| s + &l + "\n")
-}
-
-#[cfg(test)]
-macro_rules! assert_write {
-    ($bytes:expr, $tags:expr, $reference:expr) => {
-        let mut src = std::io::Cursor::new($bytes);
-
-        let mut dest = Vec::new();
-        write_tags(&mut src, &mut dest, $tags).unwrap();
-
-        if (dest != $reference) {
-            use crate::utils::hexdump;
-            panic!("\nExpected:\n{}Got:\n{}", hexdump($reference), hexdump(&dest));
-        }
-    };
-}
+pub(crate) use standard_tests;

@@ -127,5 +127,4 @@ pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: Tag
     }
 }
 
-#[cfg(test)]
-make_tests! {"png"}
+crate::utils::standard_tests!("png");

@@ -154,5 +154,4 @@ pub fn write_tags(
     Ok(())
 }
 
-#[cfg(test)]
-make_tests! {"mp4"}
+crate::utils::standard_tests!("mp4");

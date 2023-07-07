@@ -11,11 +11,9 @@
 )))]
 compile_error!("At least one format feature must be enabled for this crate to be usable.");
 
-#[macro_use]
-mod utils;
-
 mod error;
 mod formats;
+mod utils;
 
 pub use error::Error;
 use error::Result;
