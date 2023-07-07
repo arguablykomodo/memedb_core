@@ -10,9 +10,8 @@ mod png;
 mod riff;
 
 use crate::{
-    error::Result,
     utils::{read_byte, read_heap},
-    TagSet,
+    Error, TagSet,
 };
 use std::io::{Read, Seek, Write};
 
@@ -57,7 +56,7 @@ const FORMATS: &[Format] = &[
 ];
 
 // Identifies the format for a file by succesively eliminating non-matching signatures until 1 remains.
-fn identify_format(src: &mut impl Read) -> Result<Option<FormatTag>> {
+fn identify_format(src: &mut impl Read) -> Result<Option<FormatTag>, Error> {
     let mut active = Vec::new();
     let mut next = FORMATS.to_vec();
     let mut i = 0;
@@ -82,7 +81,7 @@ fn identify_format(src: &mut impl Read) -> Result<Option<FormatTag>> {
     Ok(None)
 }
 
-pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>> {
+pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>, Error> {
     if let Some(format) = identify_format(src)? {
         src.seek(std::io::SeekFrom::Start(0))?;
         let tags = match format {
@@ -107,7 +106,7 @@ pub fn write_tags(
     src: &mut (impl Read + Seek),
     dest: &mut impl Write,
     tags: TagSet,
-) -> Result<Option<()>> {
+) -> Result<Option<()>, Error> {
     if let Some(format) = identify_format(src)? {
         src.seek(std::io::SeekFrom::Start(0))?;
         match format {

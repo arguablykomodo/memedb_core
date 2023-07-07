@@ -1,8 +1,10 @@
 pub const MAGIC: &[u8] = b"ftyp";
 pub const OFFSET: usize = 4;
 
-use crate::utils::{read_heap, read_stack, skip};
-use crate::TagSet;
+use crate::{
+    utils::{read_heap, read_stack, skip},
+    Error, TagSet,
+};
 use std::io::{Read, Seek, Write};
 
 pub const MEMEDB_UUID: [u8; 16] =
@@ -86,7 +88,7 @@ impl Box {
     }
 }
 
-pub fn read_tags(src: &mut (impl Read + Seek)) -> crate::Result<crate::TagSet> {
+pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     while let Some(r#box) = Box::read(src).map_or_else(
         |e| if e.kind() == std::io::ErrorKind::UnexpectedEof { Ok(None) } else { Err(e) },
         |b| Ok(Some(b)),
@@ -115,7 +117,7 @@ pub fn write_tags(
     src: &mut (impl Read + Seek),
     dest: &mut impl Write,
     tags: TagSet,
-) -> crate::Result<()> {
+) -> Result<(), Error> {
     while let Some(r#box) = Box::read(src).map_or_else(
         |e| if e.kind() == std::io::ErrorKind::UnexpectedEof { Ok(None) } else { Err(e) },
         |b| Ok(Some(b)),

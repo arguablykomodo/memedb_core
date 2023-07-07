@@ -16,7 +16,6 @@ mod formats;
 mod utils;
 
 pub use error::Error;
-use error::Result;
 use std::io::{Read, Seek, Write};
 
 type TagSet = std::collections::HashSet<String>;
@@ -74,7 +73,7 @@ pub fn are_tags_valid(tags: &TagSet) -> bool {
 /// # Ok::<(), std::io::Error>(())
 /// ```
 /// In the case that the format is unrecognized, the function will return None.
-pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>> {
+pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>, Error> {
     formats::read_tags(src)
 }
 
@@ -92,7 +91,7 @@ pub fn write_tags(
     src: &mut (impl Read + Seek),
     dest: &mut impl Write,
     tags: TagSet,
-) -> Result<Option<()>> {
+) -> Result<Option<()>, Error> {
     if are_tags_valid(&tags) {
         formats::write_tags(src, dest, tags)
     } else {

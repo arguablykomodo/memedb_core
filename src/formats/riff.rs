@@ -16,15 +16,14 @@ pub const MAGIC: &[u8] = b"RIFF";
 pub const OFFSET: usize = 0;
 
 use crate::{
-    error::{Error, Result},
     utils::{read_heap, read_stack, skip},
-    TagSet,
+    Error, TagSet,
 };
 use std::io::{Read, Seek, Write};
 
 const TAG_CHUNK: &[u8; 4] = b"meme";
 
-pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
+pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     skip(src, MAGIC.len() as i64)?;
     let mut file_length = u32::from_le_bytes(read_stack::<4>(src)?);
     skip(src, 4)?;
@@ -54,7 +53,11 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
     Ok(TagSet::new())
 }
 
-pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
+pub fn write_tags(
+    src: &mut (impl Read + Seek),
+    dest: &mut impl Write,
+    tags: TagSet,
+) -> Result<(), Error> {
     skip(src, MAGIC.len() as i64)?;
     dest.write_all(MAGIC)?;
 

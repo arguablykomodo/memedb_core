@@ -14,9 +14,8 @@ pub const MAGIC: &[u8] = b"\xFF\xD8";
 pub const OFFSET: usize = 0;
 
 use crate::{
-    error::{Error, Result},
     utils::{read_byte, read_heap, read_stack, skip},
-    TagSet,
+    Error, TagSet,
 };
 use std::io::{Read, Seek, Write};
 
@@ -24,7 +23,7 @@ const TAGS_ID: &[u8] = b"MemeDB\x00";
 const JFIF_ID: &[u8] = b"JFIF\x00";
 const EXIF_ID: &[u8] = b"Exif\x00\x00";
 
-fn read_marker(src: &mut (impl Read + Seek)) -> Result<u8> {
+fn read_marker(src: &mut (impl Read + Seek)) -> Result<u8, Error> {
     let marker = read_byte(src)?;
     if marker == 0xFF {
         Ok(read_byte(src)?)
@@ -33,13 +32,13 @@ fn read_marker(src: &mut (impl Read + Seek)) -> Result<u8> {
     }
 }
 
-fn skip_segment(src: &mut (impl Read + Seek)) -> Result<()> {
+fn skip_segment(src: &mut (impl Read + Seek)) -> Result<(), Error> {
     let length = u16::from_be_bytes(read_stack::<2>(src)?).saturating_sub(2);
     skip(src, length as i64)?;
     Ok(())
 }
 
-fn skip_ecs(src: &mut (impl Read + Seek)) -> Result<u8> {
+fn skip_ecs(src: &mut (impl Read + Seek)) -> Result<u8, Error> {
     loop {
         if read_byte(src)? == 0xFF {
             let byte = read_byte(src)?;
@@ -50,7 +49,7 @@ fn skip_ecs(src: &mut (impl Read + Seek)) -> Result<u8> {
     }
 }
 
-pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
+pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     skip(src, MAGIC.len() as i64)?;
     let mut byte = read_marker(src)?;
     loop {
@@ -92,19 +91,19 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
                 byte = skip_ecs(src)?;
             }
             // EOI
-            0xD9 => return Ok(crate::TagSet::new()),
+            0xD9 => return Ok(TagSet::new()),
         }
     }
 }
 
-fn write_segment(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Result<()> {
+fn write_segment(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Result<(), Error> {
     let length_bytes = read_stack::<2>(src)?;
     dest.write_all(&length_bytes)?;
     dest.write_all(&read_heap(src, u16::from_be_bytes(length_bytes).saturating_sub(2) as usize)?)?;
     Ok(())
 }
 
-fn write_ecs(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Result<u8> {
+fn write_ecs(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Result<u8, Error> {
     loop {
         let byte = read_byte(src)?;
         if byte == 0xFF {
@@ -119,7 +118,7 @@ fn write_ecs(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Result<u8> 
     }
 }
 
-fn write_tags_segment(dest: &mut impl Write, tags: TagSet) -> Result<()> {
+fn write_tags_segment(dest: &mut impl Write, tags: TagSet) -> Result<(), Error> {
     let mut tags: Vec<_> = tags.into_iter().collect();
     tags.sort_unstable();
     let tags = tags.into_iter().fold(Vec::new(), |mut acc, tag| {
@@ -134,7 +133,11 @@ fn write_tags_segment(dest: &mut impl Write, tags: TagSet) -> Result<()> {
     Ok(())
 }
 
-pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
+pub fn write_tags(
+    src: &mut (impl Read + Seek),
+    dest: &mut impl Write,
+    tags: TagSet,
+) -> Result<(), Error> {
     skip(src, MAGIC.len() as i64)?;
     dest.write_all(MAGIC)?;
     let mut tags = Some(tags);

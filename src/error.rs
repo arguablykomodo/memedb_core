@@ -50,5 +50,3 @@ pub enum Error {
     #[error("Chunk lengths conflict with length according to RIFF header")]
     InvalidRiffLength,
 }
-
-pub type Result<T> = std::result::Result<T, Error>;

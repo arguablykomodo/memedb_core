@@ -35,15 +35,14 @@ pub const MAGIC: &[u8] = b"GIF89a";
 pub const OFFSET: usize = 0;
 
 use crate::{
-    error::{Error, Result},
     utils::{read_byte, read_heap, read_stack, skip},
-    TagSet,
+    Error, TagSet,
 };
 use std::io::{Read, Seek, Write};
 
 const IDENTIFIER: &[u8; 11] = b"MEMETAGS1.0";
 
-fn skip_sub_blocks(src: &mut (impl Read + Seek)) -> Result<()> {
+fn skip_sub_blocks(src: &mut (impl Read + Seek)) -> Result<(), Error> {
     loop {
         let sub_block_length = read_byte(src)?;
         if sub_block_length == 0 {
@@ -54,7 +53,7 @@ fn skip_sub_blocks(src: &mut (impl Read + Seek)) -> Result<()> {
     }
 }
 
-fn write_sub_blocks(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Result<()> {
+fn write_sub_blocks(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Result<(), Error> {
     loop {
         let sub_block_length = read_byte(src)?;
         dest.write_all(&[sub_block_length])?;
@@ -88,7 +87,7 @@ enum Section {
 }
 use Section::*;
 
-fn get_section(src: &mut (impl Read + Seek)) -> Result<Section> {
+fn get_section(src: &mut (impl Read + Seek)) -> Result<Section, Error> {
     let identifier = read_byte(src)?;
     Ok(match identifier {
         // Extension
@@ -120,7 +119,7 @@ fn get_section(src: &mut (impl Read + Seek)) -> Result<Section> {
     })
 }
 
-pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
+pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     skip(src, MAGIC.len() as i64)?;
     let logical_screen_descriptor = read_stack::<7>(src)?;
     let color_table_size = get_color_table_size(logical_screen_descriptor[4]);
@@ -158,7 +157,11 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<crate::TagSet> {
     }
 }
 
-pub fn write_tags(src: &mut (impl Read + Seek), dest: &mut impl Write, tags: TagSet) -> Result<()> {
+pub fn write_tags(
+    src: &mut (impl Read + Seek),
+    dest: &mut impl Write,
+    tags: TagSet,
+) -> Result<(), Error> {
     skip(src, MAGIC.len() as i64)?;
     dest.write_all(MAGIC)?;
 

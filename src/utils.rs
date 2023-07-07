@@ -26,7 +26,7 @@ macro_rules! standard_tests {
         #[cfg(test)]
         mod standard_tests {
             use super::{read_tags, write_tags};
-            use crate::{tagset, TagSet};
+            use crate::{are_tags_valid, tagset, TagSet};
             use quickcheck_macros::quickcheck;
             use std::io::{Cursor, Read, Seek};
 
@@ -72,7 +72,7 @@ macro_rules! standard_tests {
 
             #[quickcheck]
             fn qc_write_never_panics(bytes: Vec<u8>, tags: TagSet) -> bool {
-                if crate::are_tags_valid(&tags) {
+                if are_tags_valid(&tags) {
                     let _ = write_tags(&mut Cursor::new(&bytes), &mut std::io::sink(), tags);
                 }
                 true
@@ -80,7 +80,7 @@ macro_rules! standard_tests {
 
             #[quickcheck]
             fn qc_identity(bytes: Vec<u8>, tags: TagSet) -> bool {
-                if crate::are_tags_valid(&tags) && read_tags(&mut Cursor::new(&bytes)).is_ok() {
+                if are_tags_valid(&tags) && read_tags(&mut Cursor::new(&bytes)).is_ok() {
                     let mut dest = Vec::new();
                     write_tags(&mut Cursor::new(bytes), &mut dest, tags.clone()).unwrap();
                     let mut cursor = Cursor::new(dest);
