@@ -22,7 +22,7 @@ pub(crate) const MAGIC: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
 pub(crate) const OFFSET: usize = 0;
 
 use crate::{
-    utils::{read_heap, read_stack, skip},
+    utils::{passthrough, read_heap, read_stack, skip},
     Error, TagSet,
 };
 use std::io::{Read, Seek, Write};
@@ -85,7 +85,7 @@ pub fn write_tags(
     let chunk_type = read_stack::<4>(src)?;
     dest.write_all(&chunk_length.to_be_bytes())?;
     dest.write_all(&chunk_type)?;
-    dest.write_all(&read_heap(src, chunk_length as usize + 4)?)?;
+    passthrough(src, dest, chunk_length as u64 + 4)?;
 
     // Encode tags
     let mut tags: Vec<_> = tags.into_iter().collect();
@@ -129,14 +129,14 @@ pub fn write_tags(
             END_CHUNK => {
                 dest.write_all(&chunk_length.to_be_bytes())?;
                 dest.write_all(&chunk_type)?;
-                dest.write_all(&read_heap(src, chunk_length as usize + 4)?)?;
+                passthrough(src, dest, chunk_length as u64 + 4)?;
                 return Ok(());
             }
             // Leave unrelated chunks unchanged
             _ => {
                 dest.write_all(&chunk_length.to_be_bytes())?;
                 dest.write_all(&chunk_type)?;
-                dest.write_all(&read_heap(src, chunk_length as usize + 4)?)?;
+                passthrough(src, dest, chunk_length as u64 + 4)?;
             }
         }
     }

@@ -31,7 +31,7 @@ pub(crate) const MAGIC: &[u8] = b"\xFF\xD8";
 pub(crate) const OFFSET: usize = 0;
 
 use crate::{
-    utils::{read_byte, read_heap, read_stack, skip},
+    utils::{passthrough, read_byte, read_heap, read_stack, skip},
     Error, TagSet,
 };
 use std::io::{Read, Seek, Write};
@@ -117,7 +117,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
 fn write_segment(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Result<(), Error> {
     let length_bytes = read_stack::<2>(src)?;
     dest.write_all(&length_bytes)?;
-    dest.write_all(&read_heap(src, u16::from_be_bytes(length_bytes).saturating_sub(2) as usize)?)?;
+    passthrough(src, dest, u16::from_be_bytes(length_bytes).saturating_sub(2) as u64)?;
     Ok(())
 }
 

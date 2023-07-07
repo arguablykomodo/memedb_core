@@ -23,7 +23,7 @@ pub(crate) const MAGIC: &[u8] = b"ftyp";
 pub(crate) const OFFSET: usize = 4;
 
 use crate::{
-    utils::{read_heap, read_stack, skip},
+    utils::{or_eof, passthrough, read_heap, read_stack, skip},
     Error, TagSet,
 };
 use std::io::{Read, Seek, Write};
@@ -110,10 +110,7 @@ impl Box {
 
 /// Given a `src`, return the tags contained inside.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
-    while let Some(r#box) = Box::read(src).map_or_else(
-        |e| if e.kind() == std::io::ErrorKind::UnexpectedEof { Ok(None) } else { Err(e) },
-        |b| Ok(Some(b)),
-    )? {
+    while let Some(r#box) = or_eof(Box::read(src))? {
         if let Size::Short(0) = r#box.size {
             return Ok(TagSet::new());
         }
@@ -142,10 +139,7 @@ pub fn write_tags(
     dest: &mut impl Write,
     tags: TagSet,
 ) -> Result<(), Error> {
-    while let Some(r#box) = Box::read(src).map_or_else(
-        |e| if e.kind() == std::io::ErrorKind::UnexpectedEof { Ok(None) } else { Err(e) },
-        |b| Ok(Some(b)),
-    )? {
+    while let Some(r#box) = or_eof(Box::read(src))? {
         if let Size::Short(0) = r#box.size {
             let pos = src.stream_position()?;
             let len = src.seek(std::io::SeekFrom::End(0))?;
@@ -162,7 +156,7 @@ pub fn write_tags(
             }
             _ => {
                 r#box.write(dest)?;
-                std::io::copy(&mut src.take(r#box.data_size()), dest)?;
+                passthrough(src, dest, r#box.data_size())?;
             }
         };
     }

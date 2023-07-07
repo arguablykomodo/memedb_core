@@ -28,7 +28,7 @@ pub(crate) const MAGIC: &[u8] = b"GIF89a";
 pub(crate) const OFFSET: usize = 0;
 
 use crate::{
-    utils::{read_byte, read_heap, read_stack, skip},
+    utils::{passthrough, read_byte, read_heap, read_stack, skip},
     Error, TagSet,
 };
 use std::io::{Read, Seek, Write};
@@ -53,7 +53,7 @@ fn write_sub_blocks(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Resu
         if sub_block_length == 0 {
             return Ok(());
         } else {
-            dest.write_all(&read_heap(src, sub_block_length as usize)?[..])?;
+            passthrough(src, dest, sub_block_length as u64)?;
         }
     }
 }
@@ -165,7 +165,7 @@ pub fn write_tags(
     let logical_screen_descriptor = read_stack::<7>(src)?;
     dest.write_all(&logical_screen_descriptor)?;
     let color_table_size = get_color_table_size(logical_screen_descriptor[4]);
-    dest.write_all(&read_heap(src, color_table_size as usize)?[..])?;
+    passthrough(src, dest, color_table_size as u64)?;
 
     // Write tags
     dest.write_all(&[0x21, 0xFF, 0x0B])?;
@@ -196,7 +196,7 @@ pub fn write_tags(
                 dest.write_all(&[identifier, extension_type])?;
                 let block_size = read_byte(src)?;
                 dest.write_all(&[block_size])?;
-                dest.write_all(&read_heap(src, block_size as usize)?[..])?;
+                passthrough(src, dest, block_size as u64)?;
                 write_sub_blocks(src, dest)?;
             }
             ImageDescriptor(identifier) => {
@@ -205,7 +205,7 @@ pub fn write_tags(
                 dest.write_all(&data)?;
                 let color_table_size = get_color_table_size(data[8]);
                 // Extra byte written is LZW Minimum Code Size, i dont know what it is and i dont care
-                dest.write_all(&read_heap(src, color_table_size as usize + 1)?[..])?;
+                passthrough(src, dest, color_table_size as u64 + 1)?;
                 write_sub_blocks(src, dest)?;
             }
             Eof(identifier) => {

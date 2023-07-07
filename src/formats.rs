@@ -9,7 +9,7 @@ pub mod png;
 #[cfg(feature = "riff")]
 pub mod riff;
 
-use crate::utils::{read_byte, read_heap};
+use crate::utils::{or_eof, read_byte, read_heap};
 use std::io::Read;
 
 /// One of the possible formats identified by [`identify_format`][crate::identify_format].
@@ -68,10 +68,7 @@ pub fn identify_format(src: &mut impl Read) -> Result<Option<Format>, std::io::E
     let mut active = Vec::new();
     let mut next = FORMATS.to_vec();
     let mut i = 0;
-    while let Some(byte) = read_byte(src).map_or_else(
-        |e| if e.kind() == std::io::ErrorKind::UnexpectedEof { Ok(None) } else { Err(e) },
-        |b| Ok(Some(b)),
-    )? {
+    while let Some(byte) = or_eof(read_byte(src))? {
         let (new, still_next) = next.into_iter().partition(|f| f.offset == i);
         next = still_next;
         active = active.into_iter().chain(new).filter(|f| byte == f.magic[i - f.offset]).collect();
