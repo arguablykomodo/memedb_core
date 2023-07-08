@@ -23,7 +23,7 @@ pub(crate) const MAGIC: &[u8] = b"ftyp";
 pub(crate) const OFFSET: usize = 4;
 
 use crate::{
-    utils::{or_eof, passthrough, read_heap, read_stack, skip},
+    utils::{or_eof, passthrough, read_heap, read_stack, skip, read_byte},
     Error, TagSet,
 };
 use std::io::{Read, Seek, Write};
@@ -120,12 +120,11 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
         }
         match r#box.r#type {
             Type::Long(MEMEDB_UUID) => {
-                let mut bytes = read_heap(src, r#box.data_size()? as usize)?;
                 let mut tags = TagSet::new();
-                while !bytes.is_empty() {
-                    let size = bytes.remove(0) as usize;
-                    let bytes: Vec<u8> = bytes.drain(..size.min(bytes.len())).collect();
-                    tags.insert(String::from_utf8(bytes)?);
+                let mut tag_src = src.take(r#box.data_size()?);
+                while let Some(n) = or_eof(read_byte(&mut tag_src))? {
+                    let tag = read_heap(&mut tag_src, n as usize)?;
+                    tags.insert(String::from_utf8(tag)?);
                 }
                 return Ok(tags);
             }

@@ -22,7 +22,7 @@ pub(crate) const MAGIC: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
 pub(crate) const OFFSET: usize = 0;
 
 use crate::{
-    utils::{passthrough, read_heap, read_stack, skip},
+    utils::{passthrough, read_heap, read_stack, skip, read_byte, or_eof},
     Error, TagSet,
 };
 use std::io::{Read, Seek, Write};
@@ -41,24 +41,23 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
         match &chunk_type {
             END_CHUNK => return Ok(TagSet::new()),
             TAG_CHUNK => {
-                let mut bytes = read_heap(src, chunk_length as usize)?;
-
-                // Verify checksum
-                let checksum = u32::from_be_bytes(read_stack::<4>(src)?);
                 let mut digest = CRC.digest();
                 digest.update(&chunk_type);
-                digest.update(&bytes);
+
+                let mut tags = TagSet::new();
+                let mut tag_src = src.take(chunk_length as u64);
+                while let Some(n) = or_eof(read_byte(&mut tag_src))? {
+                    let tag = read_heap(&mut tag_src, n as usize)?;
+                    digest.update(&[n]);
+                    digest.update(&tag);
+                    tags.insert(String::from_utf8(tag)?);
+                }
+
+                let checksum = u32::from_be_bytes(read_stack::<4>(src)?);
                 if checksum != digest.finalize() {
                     return Err(Error::InvalidSource("wrong checksum"));
                 }
 
-                // Collect tags
-                let mut tags = TagSet::new();
-                while !bytes.is_empty() {
-                    let size = bytes.remove(0) as usize;
-                    let bytes: Vec<u8> = bytes.drain(..size.min(bytes.len())).collect();
-                    tags.insert(String::from_utf8(bytes)?);
-                }
                 return Ok(tags);
             }
             // We dont care about these, skip!

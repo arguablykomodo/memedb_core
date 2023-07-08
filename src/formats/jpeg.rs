@@ -31,7 +31,7 @@ pub(crate) const MAGIC: &[u8] = b"\xFF\xD8";
 pub(crate) const OFFSET: usize = 0;
 
 use crate::{
-    utils::{passthrough, read_byte, read_heap, read_stack, skip},
+    utils::{or_eof, passthrough, read_byte, read_heap, read_stack, skip},
     Error, TagSet,
 };
 use std::io::{Read, Seek, Write};
@@ -86,12 +86,11 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
                     byte = read_marker(src)?;
                 } else {
                     let length = length.saturating_sub(TAGS_ID.len());
-                    let mut bytes = read_heap(src, length)?;
                     let mut tags = TagSet::new();
-                    while !bytes.is_empty() {
-                        let size = bytes.remove(0) as usize;
-                        let bytes: Vec<u8> = bytes.drain(..size.min(bytes.len())).collect();
-                        tags.insert(String::from_utf8(bytes)?);
+                    let mut tag_src = src.take(length as u64);
+                    while let Some(n) = or_eof(read_byte(&mut tag_src))? {
+                        let tag = read_heap(&mut tag_src, n as usize)?;
+                        tags.insert(String::from_utf8(tag)?);
                     }
                     return Ok(tags);
                 }
@@ -174,15 +173,16 @@ pub fn write_tags(
             0xE0..=0xE1 => {
                 let length_bytes = read_stack::<2>(src)?;
                 let length = u16::from_be_bytes(length_bytes).saturating_sub(2);
-                let content_bytes = read_heap(src, length as usize)?;
                 dest.write_all(&[0xFF, byte])?;
                 dest.write_all(&length_bytes)?;
-                dest.write_all(&content_bytes)?;
-                if content_bytes.starts_with(match byte {
-                    0xE0 => JFIF_ID,
-                    0xE1 => EXIF_ID,
+                let id = match byte {
+                    0xE0 => read_heap(src, JFIF_ID.len())?,
+                    0xE1 => read_heap(src, EXIF_ID.len())?,
                     _ => unreachable!(),
-                }) {
+                };
+                dest.write_all(&id)?;
+                passthrough(src, dest, length.saturating_sub(id.len() as u16) as u64)?;
+                if byte == 0xE0 && id == JFIF_ID || byte == 0xE1 && id == EXIF_ID {
                     if let Some(tags) = tags.take() {
                         write_tags_segment(dest, tags)?;
                     }
@@ -193,12 +193,13 @@ pub fn write_tags(
             0xE4 => {
                 let length_bytes = read_stack::<2>(src)?;
                 let length = u16::from_be_bytes(length_bytes).saturating_sub(2);
-                let content_bytes = read_heap(src, length as usize)?;
-                if !content_bytes.starts_with(TAGS_ID) {
+                let id = read_stack::<{ TAGS_ID.len() }>(src)?;
+                if id != TAGS_ID {
                     dest.write_all(&[0xFF, byte])?;
                     dest.write_all(&length_bytes)?;
-                    dest.write_all(&content_bytes)?;
+                    passthrough(src, dest, length.saturating_sub(TAGS_ID.len() as u16) as u64)?;
                 }
+                skip(src, length.saturating_sub(TAGS_ID.len() as u16) as i64)?;
                 byte = read_marker(src)?;
             }
             // SOF, DHT, DAC, DQT, DNL, DRI, DHP, EXP, COM, APP

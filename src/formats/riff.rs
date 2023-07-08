@@ -22,7 +22,7 @@ pub(crate) const MAGIC: &[u8] = b"RIFF";
 pub(crate) const OFFSET: usize = 0;
 
 use crate::{
-    utils::{read_heap, read_stack, skip},
+    utils::{or_eof, passthrough, read_byte, read_heap, read_stack, skip},
     Error, TagSet,
 };
 use std::io::{Read, Seek, Write};
@@ -39,12 +39,11 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
         let name = read_stack::<4>(src)?;
         let length = u32::from_le_bytes(read_stack::<4>(src)?);
         if &name == TAG_CHUNK {
-            let mut bytes = read_heap(src, length as usize)?;
             let mut tags = TagSet::new();
-            while !bytes.is_empty() {
-                let size = bytes.remove(0) as usize;
-                let bytes: Vec<u8> = bytes.drain(..size.min(bytes.len())).collect();
-                tags.insert(String::from_utf8(bytes)?);
+            let mut tag_src = src.take(length as u64);
+            while let Some(n) = or_eof(read_byte(&mut tag_src))? {
+                let tag = read_heap(&mut tag_src, n as usize)?;
+                tags.insert(String::from_utf8(tag)?);
             }
             return Ok(tags);
         }
@@ -81,7 +80,7 @@ pub fn write_tags(
     // length
     let mut buffer = vec![0, 0, 0, 0];
 
-    buffer.extend_from_slice(&read_stack::<4>(src)?);
+    passthrough(src, &mut buffer, 4)?;
     file_length = file_length.checked_sub(4).ok_or(Error::InvalidSource("invalid riff length"))?;
 
     while file_length > 0 {
@@ -99,7 +98,7 @@ pub fn write_tags(
         } else {
             buffer.extend_from_slice(&name);
             buffer.extend_from_slice(&chunk_length_bytes);
-            buffer.extend_from_slice(&read_heap(src, chunk_length as usize)?);
+            passthrough(src, &mut buffer, chunk_length as u64)?;
             if (chunk_length & 1) == 1 {
                 buffer.push(0);
                 file_length = file_length
