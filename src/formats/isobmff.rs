@@ -97,26 +97,30 @@ impl Box {
         Ok(())
     }
 
-    fn data_size(&self) -> u64 {
-        (match self.size {
-            Size::Short(s) => s as u64 - 4,
-            Size::Long(s) => s - 12,
-        }) - (match self.r#type {
+    fn data_size(&self) -> Result<u64, Error> {
+        let type_size = match self.r#type {
             Type::Short(_) => 4,
             Type::Long(_) => 20,
-        })
+        };
+        let size = match self.size {
+            Size::Short(s) => (s as u64).checked_sub(4 + type_size),
+            Size::Long(s) => s.checked_sub(12 + type_size),
+        };
+        size.ok_or(Error::InvalidSource("impossible box size"))
     }
 }
 
 /// Given a `src`, return the tags contained inside.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
+    let len = src.seek(std::io::SeekFrom::End(0))?;
+    src.seek(std::io::SeekFrom::Start(0))?;
     while let Some(r#box) = or_eof(Box::read(src))? {
         if let Size::Short(0) = r#box.size {
             return Ok(TagSet::new());
         }
         match r#box.r#type {
             Type::Long(MEMEDB_UUID) => {
-                let mut bytes = read_heap(src, r#box.data_size() as usize)?;
+                let mut bytes = read_heap(src, r#box.data_size()? as usize)?;
                 let mut tags = TagSet::new();
                 while !bytes.is_empty() {
                     let size = bytes.remove(0) as usize;
@@ -125,7 +129,11 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
                 }
                 return Ok(tags);
             }
-            _ => skip(src, r#box.data_size() as i64)?,
+            _ => {
+                if skip(src, r#box.data_size()? as i64)? > len {
+                    return Err(Error::InvalidSource("impossible box size"));
+                }
+            }
         };
     }
     Ok(TagSet::new())
@@ -152,11 +160,11 @@ pub fn write_tags(
         }
         match r#box.r#type {
             Type::Long(MEMEDB_UUID) => {
-                skip(src, r#box.data_size() as i64)?;
+                skip(src, r#box.data_size()? as i64)?;
             }
             _ => {
                 r#box.write(dest)?;
-                passthrough(src, dest, r#box.data_size())?;
+                passthrough(src, dest, r#box.data_size()?)?;
             }
         };
     }
