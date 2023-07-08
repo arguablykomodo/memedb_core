@@ -197,9 +197,11 @@ pub fn write_tags(
                 if id != TAGS_ID {
                     dest.write_all(&[0xFF, byte])?;
                     dest.write_all(&length_bytes)?;
+                    dest.write_all(&id)?;
                     passthrough(src, dest, length.saturating_sub(TAGS_ID.len() as u16) as u64)?;
+                } else {
+                    skip(src, length.saturating_sub(TAGS_ID.len() as u16) as i64)?;
                 }
-                skip(src, length.saturating_sub(TAGS_ID.len() as u16) as i64)?;
                 byte = read_marker(src)?;
             }
             // SOF, DHT, DAC, DQT, DNL, DRI, DHP, EXP, COM, APP
