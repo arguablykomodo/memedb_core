@@ -35,20 +35,6 @@ nightly-test:
 
 # TODO: find a way to cache the cargo-fuzz installation
 
-fuzz-png:
-  stage: fuzz
-  image: rustlang/rust:nightly
-  script:
-    - cargo install cargo-fuzz
-    - ./fuzz.sh png read_never_panics
-    - ./fuzz.sh png write_never_panics
-    - ./fuzz.sh png identity
-  artifacts:
-    when: on_failure
-    paths:
-      - fuzz/artifacts/
-      - fuzz/corpus/
-
 fuzz-gif:
   stage: fuzz
   image: rustlang/rust:nightly
@@ -63,14 +49,14 @@ fuzz-gif:
       - fuzz/artifacts/
       - fuzz/corpus/
 
-fuzz-riff:
+fuzz-isobmff:
   stage: fuzz
   image: rustlang/rust:nightly
   script:
     - cargo install cargo-fuzz
-    - ./fuzz.sh riff read_never_panics webp
-    - ./fuzz.sh riff write_never_panics webp
-    - ./fuzz.sh riff identity webp
+    - ./fuzz.sh isobmff read_never_panics mp4
+    - ./fuzz.sh isobmff write_never_panics mp4
+    - ./fuzz.sh isobmff identity mp4
   artifacts:
     when: on_failure
     paths:
@@ -85,6 +71,34 @@ fuzz-jpeg:
     - ./fuzz.sh jpeg read_never_panics jpeg
     - ./fuzz.sh jpeg write_never_panics jpeg
     - ./fuzz.sh jpeg identity jpeg
+  artifacts:
+    when: on_failure
+    paths:
+      - fuzz/artifacts/
+      - fuzz/corpus/
+
+fuzz-png:
+  stage: fuzz
+  image: rustlang/rust:nightly
+  script:
+    - cargo install cargo-fuzz
+    - ./fuzz.sh png read_never_panics png
+    - ./fuzz.sh png write_never_panics png
+    - ./fuzz.sh png identity png
+  artifacts:
+    when: on_failure
+    paths:
+      - fuzz/artifacts/
+      - fuzz/corpus/
+
+fuzz-riff:
+  stage: fuzz
+  image: rustlang/rust:nightly
+  script:
+    - cargo install cargo-fuzz
+    - ./fuzz.sh riff read_never_panics webp
+    - ./fuzz.sh riff write_never_panics webp
+    - ./fuzz.sh riff identity webp
   artifacts:
     when: on_failure
     paths:
