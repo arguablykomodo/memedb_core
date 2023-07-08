@@ -23,7 +23,7 @@ pub(crate) const MAGIC: &[u8] = b"ftyp";
 pub(crate) const OFFSET: usize = 4;
 
 use crate::{
-    utils::{or_eof, passthrough, read_heap, read_stack, skip, read_byte},
+    utils::{or_eof, passthrough, read_byte, read_heap, read_stack, skip},
     Error, TagSet,
 };
 use std::io::{Read, Seek, Write};
