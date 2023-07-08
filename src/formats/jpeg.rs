@@ -175,14 +175,21 @@ pub fn write_tags(
                 let length = u16::from_be_bytes(length_bytes).saturating_sub(2);
                 dest.write_all(&[0xFF, byte])?;
                 dest.write_all(&length_bytes)?;
-                let id = match byte {
-                    0xE0 => read_heap(src, JFIF_ID.len())?,
-                    0xE1 => read_heap(src, EXIF_ID.len())?,
-                    _ => unreachable!(),
+                let should_write = if byte == 0xE0 && length >= JFIF_ID.len() as u16 {
+                    let id = read_stack::<{ JFIF_ID.len() }>(src)?;
+                    dest.write_all(&id)?;
+                    passthrough(src, dest, length.saturating_sub(id.len() as u16) as u64)?;
+                    id == JFIF_ID
+                } else if byte == 0xE1 && length >= EXIF_ID.len() as u16 {
+                    let id = read_stack::<{ EXIF_ID.len() }>(src)?;
+                    dest.write_all(&id)?;
+                    passthrough(src, dest, length.saturating_sub(id.len() as u16) as u64)?;
+                    id == EXIF_ID
+                } else {
+                    passthrough(src, dest, length as u64)?;
+                    false
                 };
-                dest.write_all(&id)?;
-                passthrough(src, dest, length.saturating_sub(id.len() as u16) as u64)?;
-                if byte == 0xE0 && id == JFIF_ID || byte == 0xE1 && id == EXIF_ID {
+                if should_write {
                     if let Some(tags) = tags.take() {
                         write_tags_segment(dest, tags)?;
                     }
@@ -193,14 +200,18 @@ pub fn write_tags(
             0xE4 => {
                 let length_bytes = read_stack::<2>(src)?;
                 let length = u16::from_be_bytes(length_bytes).saturating_sub(2);
-                let id = read_stack::<{ TAGS_ID.len() }>(src)?;
-                if id != TAGS_ID {
-                    dest.write_all(&[0xFF, byte])?;
-                    dest.write_all(&length_bytes)?;
-                    dest.write_all(&id)?;
-                    passthrough(src, dest, length.saturating_sub(TAGS_ID.len() as u16) as u64)?;
+                if length >= TAGS_ID.len() as u16 {
+                    let id = read_stack::<{ TAGS_ID.len() }>(src)?;
+                    if id != TAGS_ID {
+                        dest.write_all(&[0xFF, byte])?;
+                        dest.write_all(&length_bytes)?;
+                        dest.write_all(&id)?;
+                        passthrough(src, dest, length.saturating_sub(id.len() as u16) as u64)?;
+                    } else {
+                        skip(src, length.saturating_sub(id.len() as u16) as i64)?;
+                    }
                 } else {
-                    skip(src, length.saturating_sub(TAGS_ID.len() as u16) as i64)?;
+                    skip(src, length as i64)?;
                 }
                 byte = read_marker(src)?;
             }
