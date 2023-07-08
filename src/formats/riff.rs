@@ -34,7 +34,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     skip(src, MAGIC.len() as i64)?;
     let mut file_length = u32::from_le_bytes(read_stack::<4>(src)?);
     skip(src, 4)?;
-    file_length = file_length.checked_sub(4).ok_or(Error::InvalidRiffLength)?;
+    file_length = file_length.checked_sub(4).ok_or(Error::InvalidSource("invalid riff length"))?;
     while file_length > 0 {
         let name = read_stack::<4>(src)?;
         let length = u32::from_le_bytes(read_stack::<4>(src)?);
@@ -51,11 +51,14 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
         skip(src, length as i64)?;
         if (length & 1) == 1 {
             skip(src, 1)?;
-            file_length = file_length.checked_sub(1).ok_or(Error::InvalidRiffLength)?;
+            file_length =
+                file_length.checked_sub(1).ok_or(Error::InvalidSource("invalid riff lengh"))?;
         }
         // Name + length + payload
-        file_length = file_length.checked_sub(4 + 4).ok_or(Error::InvalidRiffLength)?;
-        file_length = file_length.checked_sub(length).ok_or(Error::InvalidRiffLength)?;
+        file_length =
+            file_length.checked_sub(4 + 4).ok_or(Error::InvalidSource("invalid riff lengh"))?;
+        file_length =
+            file_length.checked_sub(length).ok_or(Error::InvalidSource("invalid riff lengh"))?;
     }
     Ok(TagSet::new())
 }
@@ -79,7 +82,7 @@ pub fn write_tags(
     let mut buffer = vec![0, 0, 0, 0];
 
     buffer.extend_from_slice(&read_stack::<4>(src)?);
-    file_length = file_length.checked_sub(4).ok_or(Error::InvalidRiffLength)?;
+    file_length = file_length.checked_sub(4).ok_or(Error::InvalidSource("invalid riff length"))?;
 
     while file_length > 0 {
         let name = read_stack::<4>(src)?;
@@ -89,7 +92,9 @@ pub fn write_tags(
             skip(src, chunk_length as i64)?;
             if (chunk_length & 1) == 1 {
                 skip(src, 1)?;
-                file_length = file_length.checked_sub(1).ok_or(Error::InvalidRiffLength)?;
+                file_length = file_length
+                    .checked_sub(1)
+                    .ok_or(Error::InvalidSource("invalid riff length"))?;
             }
         } else {
             buffer.extend_from_slice(&name);
@@ -97,12 +102,17 @@ pub fn write_tags(
             buffer.extend_from_slice(&read_heap(src, chunk_length as usize)?);
             if (chunk_length & 1) == 1 {
                 buffer.push(0);
-                file_length = file_length.checked_sub(1).ok_or(Error::InvalidRiffLength)?;
+                file_length = file_length
+                    .checked_sub(1)
+                    .ok_or(Error::InvalidSource("invalid riff length"))?;
             }
         }
         // Name + length + payload
-        file_length = file_length.checked_sub(4 + 4).ok_or(Error::InvalidRiffLength)?;
-        file_length = file_length.checked_sub(chunk_length).ok_or(Error::InvalidRiffLength)?;
+        file_length =
+            file_length.checked_sub(4 + 4).ok_or(Error::InvalidSource("invalid riff length"))?;
+        file_length = file_length
+            .checked_sub(chunk_length)
+            .ok_or(Error::InvalidSource("invalid riff length"))?;
     }
 
     // We have to store the tags at the end because webp wants the chunks to be in a specific order

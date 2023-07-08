@@ -89,9 +89,9 @@ fn get_section(src: &mut (impl Read + Seek)) -> Result<Section, Error> {
             match extension_type {
                 // Application Extension
                 0xFF => {
-                    let block_size = read_byte(src)?; // Should always be 11
+                    let block_size = read_byte(src)?;
                     if block_size != 11 {
-                        return Err(Error::GifWrongApplicationIdentifierLen(block_size));
+                        return Err(Error::InvalidSource("wrong block size"));
                     }
                     let application_identifier = read_stack::<11>(src)?;
                     if &application_identifier == IDENTIFIER {
@@ -103,12 +103,12 @@ fn get_section(src: &mut (impl Read + Seek)) -> Result<Section, Error> {
                 0xFE => Comment(identifier, extension_type),
                 0xF9 => GraphicsControl(identifier, extension_type),
                 0x01 => Plaintext(identifier, extension_type),
-                byte => return Err(Error::GifUnknownExtension(byte)),
+                _ => return Err(Error::InvalidSource("unknown extension type")),
             }
         }
         0x2C => ImageDescriptor(identifier),
         0x3B => Eof(identifier),
-        byte => return Err(Error::GifUnknownBlock(byte)),
+        _ => return Err(Error::InvalidSource("malformed gif data")),
     })
 }
 

@@ -49,7 +49,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
                 digest.update(&chunk_type);
                 digest.update(&bytes);
                 if checksum != digest.finalize() {
-                    return Err(Error::PngChecksum);
+                    return Err(Error::InvalidSource("wrong checksum"));
                 }
 
                 // Collect tags
