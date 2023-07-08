@@ -40,7 +40,7 @@ const TAGS_ID: &[u8] = b"MemeDB\x00";
 const JFIF_ID: &[u8] = b"JFIF\x00";
 const EXIF_ID: &[u8] = b"Exif\x00\x00";
 
-fn read_marker(src: &mut (impl Read + Seek)) -> Result<u8, Error> {
+fn read_marker(src: &mut impl Read) -> Result<u8, Error> {
     let marker = read_byte(src)?;
     if marker == 0xFF {
         Ok(read_byte(src)?)
@@ -55,7 +55,7 @@ fn skip_segment(src: &mut (impl Read + Seek)) -> Result<(), Error> {
     Ok(())
 }
 
-fn skip_ecs(src: &mut (impl Read + Seek)) -> Result<u8, Error> {
+fn skip_ecs(src: &mut impl Read) -> Result<u8, Error> {
     loop {
         if read_byte(src)? == 0xFF {
             let byte = read_byte(src)?;
@@ -115,14 +115,14 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
     }
 }
 
-fn write_segment(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Result<(), Error> {
+fn write_segment(src: &mut impl Read, dest: &mut impl Write) -> Result<(), Error> {
     let length_bytes = read_stack::<2>(src)?;
     dest.write_all(&length_bytes)?;
     passthrough(src, dest, u16::from_be_bytes(length_bytes).saturating_sub(2) as u64)?;
     Ok(())
 }
 
-fn write_ecs(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Result<u8, Error> {
+fn write_ecs(src: &mut impl Read, dest: &mut impl Write) -> Result<u8, Error> {
     loop {
         let byte = read_byte(src)?;
         if byte == 0xFF {

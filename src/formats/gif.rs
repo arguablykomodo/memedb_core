@@ -46,7 +46,7 @@ fn skip_sub_blocks(src: &mut (impl Read + Seek)) -> Result<(), Error> {
     }
 }
 
-fn write_sub_blocks(src: &mut (impl Read + Seek), dest: &mut impl Write) -> Result<(), Error> {
+fn write_sub_blocks(src: &mut impl Read, dest: &mut impl Write) -> Result<(), Error> {
     loop {
         let sub_block_length = read_byte(src)?;
         dest.write_all(&[sub_block_length])?;
@@ -80,7 +80,7 @@ enum Section {
 }
 use Section::*;
 
-fn get_section(src: &mut (impl Read + Seek)) -> Result<Section, Error> {
+fn get_section(src: &mut impl Read) -> Result<Section, Error> {
     let identifier = read_byte(src)?;
     Ok(match identifier {
         // Extension
