@@ -6,8 +6,8 @@ fn read() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("media");
     for file in path.read_dir().unwrap() {
         let path = file.unwrap().path();
-        let mut file = File::open(path).unwrap();
-        read_tags(&mut file).unwrap();
+        let file = File::open(path).unwrap();
+        read_tags(&mut std::io::BufReader::new(file)).unwrap();
     }
 }
 

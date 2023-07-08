@@ -22,7 +22,7 @@ mod utils;
 
 pub use error::Error;
 pub use formats::*;
-use std::io::{Read, Seek, Write};
+use std::io::{BufRead, Read, Seek, Write};
 
 type TagSet = std::collections::HashSet<String>;
 
@@ -66,7 +66,7 @@ pub fn are_tags_valid(tags: &TagSet) -> bool {
 ///
 /// This function operates by first calling [`identify_format`](crate::identify_format), and then
 /// calling the corresponding `read_tags` function if successful.
-pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Option<TagSet>, Error> {
+pub fn read_tags(src: &mut (impl Read + BufRead + Seek)) -> Result<Option<TagSet>, Error> {
     if let Some(format) = identify_format(src)? {
         src.seek(std::io::SeekFrom::Start(0))?;
         let tags = match format {

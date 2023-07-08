@@ -34,7 +34,7 @@ use crate::{
     utils::{or_eof, passthrough, read_byte, read_heap, read_stack, skip},
     Error, TagSet,
 };
-use std::io::{Read, Seek, Write};
+use std::io::{BufRead, Read, Seek, Write};
 
 const TAGS_ID: &[u8] = b"MemeDB\x00";
 const JFIF_ID: &[u8] = b"JFIF\x00";
@@ -55,19 +55,27 @@ fn skip_segment(src: &mut (impl Read + Seek)) -> Result<(), Error> {
     Ok(())
 }
 
-fn skip_ecs(src: &mut impl Read) -> Result<u8, Error> {
+fn skip_ecs(src: &mut (impl Read + BufRead)) -> Result<u8, Error> {
     loop {
-        if read_byte(src)? == 0xFF {
+        let buf = src.fill_buf()?;
+        let len = buf.len();
+        if len == 0 {
+            return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof).into());
+        }
+        if let Some(i) = memchr::memchr(0xFF, buf) {
+            src.consume(i + 1);
             let byte = read_byte(src)?;
             if byte != 0x00 {
                 return Ok(byte);
             }
+        } else {
+            src.consume(len);
         }
     }
 }
 
 /// Given a `src`, return the tags contained inside.
-pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
+pub fn read_tags(src: &mut (impl Read + BufRead + Seek)) -> Result<TagSet, Error> {
     skip(src, MAGIC.len() as i64)?;
     let mut byte = read_marker(src)?;
     loop {
