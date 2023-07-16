@@ -1,0 +1,47 @@
+on:
+  schedule:
+    - cron: '04 19 * * *'
+name: Fuzz testing
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        format:
+          - gif
+          - isobmff
+          - jpeg
+          - png
+          - riff
+        include:
+          - format: isobmff
+            extension: mp4
+          - format: riff
+            extension: webp
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v3
+        with:
+          path: fuzz/corpus/
+          key: fuzz-corpus-${{ matrix.format }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+      - uses: actions-rs/install@v0.1
+        with:
+          crate: cargo-fuzz
+          version: latest
+      - name: Read never panics
+        run: './fuzz.sh ${{ matrix.format }} read_never_panics ${{ matrix.extension || matrix.format }}'
+      - name: Write never panics
+        run: './fuzz.sh ${{ matrix.format }} write_never_panics ${{ matrix.extension || matrix.format }}'
+      - name: Identity
+        run: './fuzz.sh ${{ matrix.format }} identity ${{ matrix.extension || matrix.format }}'
+      - if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: fuzz-artifacts
+          path: |
+            fuzz/artifacts/
+            fuzz/corpus/
