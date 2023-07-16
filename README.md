@@ -6,7 +6,7 @@ extending media formats to add custom metadata.
 ## Supported Formats
 
 - GIF
-- ISO base media file format
+- ISOBMFF
   - MP4
   - JPEG 2000
   - 3GP

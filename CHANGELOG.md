@@ -15,6 +15,8 @@
 
 - Added support for RIFF containers, which include WEBP, WAV, and AVI, among
   others.
+- Added support for ISOBMFF containers, which include MP4, JPEG 2000, and 3GP,
+  among others.
 
 ### Changes
 
