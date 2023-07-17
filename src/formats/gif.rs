@@ -92,7 +92,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
                 passthrough_blocks(src, &mut std::io::sink())?;
             }
             0x3B => return Ok(TagSet::new()),
-            _ => return Err(Error::InvalidSource("unknown gif data")),
+            byte => return Err(Error::GifUnknownBlock(byte)),
         }
     }
 }
@@ -156,7 +156,7 @@ pub fn write_tags(
                 dest.write_all(&[byte])?;
                 return Ok(());
             }
-            _ => return Err(Error::InvalidSource("unknown gif data")),
+            byte => return Err(Error::GifUnknownBlock(byte)),
         }
     }
 }

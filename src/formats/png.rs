@@ -55,7 +55,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
 
                 let checksum = u32::from_be_bytes(read_stack::<4>(src)?);
                 if checksum != digest.finalize() {
-                    return Err(Error::InvalidSource("wrong checksum"));
+                    return Err(Error::PngChecksum);
                 }
 
                 return Ok(tags);
@@ -97,7 +97,7 @@ pub fn write_tags(
 
     // If this error is returned, someone has *way* too many tags
     if tags.len() as u64 >= std::u32::MAX as u64 {
-        return Err(Error::ChunkSizeOverflow);
+        return Err(Error::PngChunkSizeOverflow);
     }
 
     // Compute checksum

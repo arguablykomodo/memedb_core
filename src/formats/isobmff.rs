@@ -106,7 +106,7 @@ impl Box {
             Size::Short(s) => (s as u64).checked_sub(4 + type_size),
             Size::Long(s) => s.checked_sub(12 + type_size),
         };
-        size.ok_or(Error::InvalidSource("impossible box size"))
+        size.ok_or(Error::IsobmffBoxTooSmall)
     }
 }
 
@@ -130,7 +130,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
             }
             _ => {
                 if skip(src, r#box.data_size()? as i64)? > len {
-                    return Err(Error::InvalidSource("impossible box size"));
+                    return Err(Error::IsobmffBoxTooBig);
                 }
             }
         };

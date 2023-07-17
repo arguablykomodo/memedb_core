@@ -45,7 +45,7 @@ fn read_marker(src: &mut impl Read) -> Result<u8, Error> {
     if marker == 0xFF {
         Ok(read_byte(src)?)
     } else {
-        Err(Error::InvalidSource("missing segment marker"))
+        Err(Error::JpegMissingSegmentMarker(marker))
     }
 }
 
@@ -80,9 +80,7 @@ pub fn read_tags(src: &mut (impl Read + BufRead + Seek)) -> Result<TagSet, Error
     let mut byte = read_marker(src)?;
     loop {
         match byte {
-            0x00..=0xBF | 0xD8 | 0xF0..=0xFD | 0xFF => {
-                return Err(Error::InvalidSource("unknown jpeg segment"))
-            }
+            0x00..=0xBF | 0xD8 | 0xF0..=0xFD | 0xFF => return Err(Error::JpegUnknownSegment(byte)),
             // APP4
             0xE4 => {
                 let length = u16::from_be_bytes(read_stack::<2>(src)?).saturating_sub(2) as usize;
@@ -174,9 +172,7 @@ pub fn write_tags(
     let mut byte = read_marker(src)?;
     loop {
         match byte {
-            0x00..=0xBF | 0xD8 | 0xF0..=0xFD | 0xFF => {
-                return Err(Error::InvalidSource("unknown jpeg segment"))
-            }
+            0x00..=0xBF | 0xD8 | 0xF0..=0xFD | 0xFF => return Err(Error::JpegUnknownSegment(byte)),
             // APP0-APP1
             0xE0..=0xE1 => {
                 let length_bytes = read_stack::<2>(src)?;
