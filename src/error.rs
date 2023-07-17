@@ -22,15 +22,6 @@ pub enum Error {
     #[error("unknown GIF block found, expected one of 0x21, 0x2C, or 0x3B, but found {0:X}")]
     GifUnknownBlock(u8),
 
-    /// The size field of the box being read marks it as smaller than its header, which is
-    /// impossible.
-    #[error("box size is smaller than possible")]
-    IsobmffBoxTooSmall,
-    /// The size field of the box being read marks it as larger than the size of the file, which is
-    /// impossible.
-    #[error("box size is larger than expected")]
-    IsobmffBoxTooBig,
-
     /// Every JPEG segment must start with a 0xFF byte, this error is thrown if they don't.
     #[error("segment marker should be 0xFF, but found {0:X}")]
     JpegMissingSegmentMarker(u8),

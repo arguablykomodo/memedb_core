@@ -97,23 +97,21 @@ impl Box {
         Ok(())
     }
 
-    fn data_size(&self) -> Result<u64, Error> {
+    fn data_size(&self) -> u64 {
         let type_size = match self.r#type {
             Type::Short(_) => 4,
             Type::Long(_) => 20,
         };
-        let size = match self.size {
-            Size::Short(s) => (s as u64).checked_sub(4 + type_size),
-            Size::Long(s) => s.checked_sub(12 + type_size),
-        };
-        size.ok_or(Error::IsobmffBoxTooSmall)
+        // Prevents panic when box size is impossibly small, will instead silently pass through.
+        match self.size {
+            Size::Short(s) => (s as u64).saturating_sub(4 + type_size),
+            Size::Long(s) => s.saturating_sub(12 + type_size),
+        }
     }
 }
 
 /// Given a `src`, return the tags contained inside.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
-    let len = src.seek(std::io::SeekFrom::End(0))?;
-    src.seek(std::io::SeekFrom::Start(0))?;
     while let Some(r#box) = or_eof(Box::read(src))? {
         if let Size::Short(0) = r#box.size {
             return Ok(TagSet::new());
@@ -121,7 +119,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
         match r#box.r#type {
             Type::Long(MEMEDB_UUID) => {
                 let mut tags = TagSet::new();
-                let mut tag_src = src.take(r#box.data_size()?);
+                let mut tag_src = src.take(r#box.data_size());
                 while let Some(n) = or_eof(read_byte(&mut tag_src))? {
                     let tag = read_heap(&mut tag_src, n as usize)?;
                     tags.insert(String::from_utf8(tag)?);
@@ -129,8 +127,10 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
                 return Ok(tags);
             }
             _ => {
-                if skip(src, r#box.data_size()? as i64)? > len {
-                    return Err(Error::IsobmffBoxTooBig);
+                let size = r#box.data_size();
+                // We passthrough instead of skip to get number of bytes read
+                if passthrough(src, &mut std::io::sink(), size)? != size {
+                    return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))?;
                 }
             }
         };
@@ -159,11 +159,11 @@ pub fn write_tags(
         }
         match r#box.r#type {
             Type::Long(MEMEDB_UUID) => {
-                skip(src, r#box.data_size()? as i64)?;
+                skip(src, r#box.data_size() as i64)?;
             }
             _ => {
                 r#box.write(dest)?;
-                passthrough(src, dest, r#box.data_size()?)?;
+                passthrough(src, dest, r#box.data_size())?;
             }
         };
     }
