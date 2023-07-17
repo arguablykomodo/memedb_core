@@ -7,10 +7,9 @@ use std::io::Cursor;
 fuzz_target!(|data: (Vec<u8>, HashSet<String>)| {
     if are_tags_valid(&data.1) {
         if let Ok(Some(_)) = read_tags(&mut Cursor::new(&data.0)) {
-            let mut new_data = Vec::new();
-            let result = write_tags(&mut Cursor::new(data.0), &mut new_data, data.1.clone());
-            if let Ok(Some(_)) = result {
-                assert_eq!(read_tags(&mut Cursor::new(new_data)).unwrap().unwrap(), data.1);
+            let mut dest = Vec::new();
+            if let Ok(Some(_)) = write_tags(&mut Cursor::new(data.0), &mut dest, data.1.clone()) {
+                assert_eq!(read_tags(&mut Cursor::new(dest)).unwrap().unwrap(), data.1);
             }
         }
     }

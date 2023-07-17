@@ -100,12 +100,11 @@ macro_rules! standard_tests {
             fn qc_identity(bytes: Vec<u8>, tags: TagSet) -> bool {
                 if are_tags_valid(&tags) && read_tags(&mut Cursor::new(&bytes)).is_ok() {
                     let mut dest = Vec::new();
-                    write_tags(&mut Cursor::new(bytes), &mut dest, tags.clone()).unwrap();
-                    let mut cursor = Cursor::new(dest);
-                    read_tags(&mut cursor).unwrap() == tags
-                } else {
-                    true
+                    if write_tags(&mut Cursor::new(bytes), &mut dest, tags.clone()).is_ok() {
+                        return read_tags(&mut Cursor::new(dest)).unwrap() == tags
+                    }
                 }
+                true
             }
         }
     };
