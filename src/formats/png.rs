@@ -43,24 +43,20 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
             TAG_CHUNK => {
                 let mut digest = CRC.digest();
                 digest.update(&chunk_type);
-
                 let mut tags = TagSet::new();
-                let mut tag_src = src.take(chunk_length as u64);
-                while let Some(n) = or_eof(read_byte(&mut tag_src))? {
-                    let tag = read_heap(&mut tag_src, n as usize)?;
+                let mut data = src.take(chunk_length as u64);
+                while let Some(n) = or_eof(read_byte(&mut data))? {
+                    let tag = read_heap(&mut data, n as usize)?;
                     digest.update(&[n]);
                     digest.update(&tag);
                     tags.insert(String::from_utf8(tag)?);
                 }
-
                 let checksum = u32::from_be_bytes(read_stack::<4>(src)?);
                 if checksum != digest.finalize() {
                     return Err(Error::PngChecksum);
                 }
-
                 return Ok(tags);
             }
-            // We dont care about these, skip!
             _ => {
                 skip(src, chunk_length as i64 + 4)?;
             }
@@ -76,62 +72,44 @@ pub fn write_tags(
     dest: &mut impl Write,
     tags: TagSet,
 ) -> Result<(), Error> {
-    skip(src, MAGIC.len() as i64)?;
-    dest.write_all(MAGIC)?;
-
-    // The first chunk should always be IHDR, according to the spec, so we are going to read it manually
+    passthrough(src, dest, MAGIC.len() as u64)?;
+    // Passthrough first IHDR chunk
     let chunk_length = u32::from_be_bytes(read_stack::<4>(src)?);
     let chunk_type = read_stack::<4>(src)?;
     dest.write_all(&chunk_length.to_be_bytes())?;
     dest.write_all(&chunk_type)?;
     passthrough(src, dest, chunk_length as u64 + 4)?;
 
-    // Encode tags
+    let mut digest = CRC.digest();
+    digest.update(TAG_CHUNK);
     let mut tags: Vec<_> = tags.into_iter().collect();
     tags.sort_unstable();
     let tags = tags.into_iter().fold(Vec::new(), |mut acc, tag| {
+        let mut tag = tag.into_bytes();
+        digest.update(&[tag.len() as u8]);
+        digest.update(&tag);
         acc.push(tag.len() as u8);
-        acc.append(&mut tag.into_bytes());
+        acc.append(&mut tag);
         acc
     });
-
-    // If this error is returned, someone has *way* too many tags
-    if tags.len() as u64 >= std::u32::MAX as u64 {
-        return Err(Error::PngChunkSizeOverflow);
-    }
-
-    // Compute checksum
-    let checksum = {
-        let mut digest = CRC.digest();
-        digest.update(TAG_CHUNK);
-        digest.update(&tags);
-        digest.finalize()
-    };
-
-    // Write tag chunk
-    let mut buffer = Vec::new();
-    buffer.extend((tags.len() as u32).to_be_bytes());
-    buffer.extend(TAG_CHUNK);
-    buffer.extend(tags);
-    buffer.extend(checksum.to_be_bytes());
-    dest.write_all(&buffer)?;
+    dest.write_all(&(tags.len() as u32).to_be_bytes())?;
+    dest.write_all(TAG_CHUNK)?;
+    dest.write_all(&tags)?;
+    dest.write_all(&digest.finalize().to_be_bytes())?;
 
     loop {
         let chunk_length = u32::from_be_bytes(read_stack::<4>(src)?);
         let chunk_type = read_stack::<4>(src)?;
         match &chunk_type {
-            // Skip old tags
             TAG_CHUNK => {
                 skip(src, chunk_length as i64 + 4)?;
             }
-            // Write rest of the file
             END_CHUNK => {
                 dest.write_all(&chunk_length.to_be_bytes())?;
                 dest.write_all(&chunk_type)?;
                 passthrough(src, dest, chunk_length as u64 + 4)?;
                 return Ok(());
             }
-            // Leave unrelated chunks unchanged
             _ => {
                 dest.write_all(&chunk_length.to_be_bytes())?;
                 dest.write_all(&chunk_type)?;

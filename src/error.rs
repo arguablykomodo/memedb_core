@@ -29,9 +29,6 @@ pub enum Error {
     /// There is a mismatch between the calculated CRC-32 hash and the one found in the block.
     #[error("corrupted tags in PNG data")]
     PngChecksum,
-    /// The tags being written are larger than the maximum PNG chunk size of 2^32-1 bytes.
-    #[error("size of tags overflows maximum chunk size")]
-    PngChunkSizeOverflow,
 
     /// The header of the RIFF file declares a file length that is smaller than the sum of lengths
     /// reported by individual chunks.

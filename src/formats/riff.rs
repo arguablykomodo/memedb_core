@@ -114,10 +114,6 @@ pub fn write_tags(
         acc
     });
 
-    if tag_bytes.len() as u64 >= std::u32::MAX as u64 {
-        return Err(Error::RiffChunkSizeOverflow);
-    }
-
     let tags_length = tag_bytes.len() as u32;
     buffer.extend_from_slice(TAG_CHUNK);
     buffer.extend(tags_length.to_le_bytes().iter());
