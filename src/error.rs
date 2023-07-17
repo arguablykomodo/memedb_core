@@ -22,12 +22,9 @@ pub enum Error {
     #[error("unknown GIF block found, expected one of 0x21, 0x2C, or 0x3B, but found {0:X}")]
     GifUnknownBlock(u8),
 
-    /// Every JPEG segment must start with a 0xFF byte, this error is thrown if they don't.
-    #[error("segment marker should be 0xFF, but found {0:X}")]
-    JpegMissingSegmentMarker(u8),
-    /// An unrecognized JPEG Segment was found.
-    #[error("unknown segment found, expected 0xC0-0xD7, 0xD9-0xEF, or 0xFE, but found {0:X}")]
-    JpegUnknownSegment(u8),
+    /// An invalid JPEG marker was found.
+    #[error("0x00 byte found where marker was expected")]
+    JpegInvalidMarker,
 
     /// There is a mismatch between the calculated CRC-32 hash and the one found in the block.
     #[error("corrupted tags in PNG data")]

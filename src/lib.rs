@@ -94,7 +94,7 @@ pub fn read_tags(src: &mut (impl Read + BufRead + Seek)) -> Result<Option<TagSet
 /// This function operates by first calling [`identify_format`](crate::identify_format), and then
 /// calling the corresponding `write_tags` function if successful.
 pub fn write_tags(
-    src: &mut (impl Read + Seek),
+    src: &mut (impl Read + BufRead + Seek),
     dest: &mut impl Write,
     tags: TagSet,
 ) -> Result<Option<()>, Error> {

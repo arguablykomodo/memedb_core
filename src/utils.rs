@@ -46,14 +46,14 @@ macro_rules! standard_tests {
             use super::{read_tags, write_tags};
             use crate::{are_tags_valid, tagset, TagSet};
             use quickcheck_macros::quickcheck;
-            use std::io::{Cursor, Read, Seek};
+            use std::io::{BufRead, Cursor, Read, Seek};
 
             const UNTAGGED: &[u8] = include_bytes!(concat!("../../tests/media/minimal.", $e));
             const EMPTY: &[u8] = include_bytes!(concat!("../../tests/media/minimal_empty.", $e));
             const TAGGED: &[u8] = include_bytes!(concat!("../../tests/media/minimal_tagged.", $e));
             const LARGE: &[u8] = include_bytes!(concat!("../../tests/media/large.", $e));
 
-            fn write(src: &mut (impl Read + Seek), tags: TagSet) -> Vec<u8> {
+            fn write(src: &mut (impl Read + BufRead + Seek), tags: TagSet) -> Vec<u8> {
                 let mut buf = Vec::new();
                 write_tags(src, &mut buf, tags).unwrap();
                 buf
@@ -101,7 +101,7 @@ macro_rules! standard_tests {
                 if are_tags_valid(&tags) && read_tags(&mut Cursor::new(&bytes)).is_ok() {
                     let mut dest = Vec::new();
                     if write_tags(&mut Cursor::new(bytes), &mut dest, tags.clone()).is_ok() {
-                        return read_tags(&mut Cursor::new(dest)).unwrap() == tags
+                        return read_tags(&mut Cursor::new(dest)).unwrap() == tags;
                     }
                 }
                 true

@@ -16,7 +16,7 @@ fn write() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("media");
     for file in path.read_dir().unwrap() {
         let path = file.unwrap().path();
-        let mut file = File::open(path).unwrap();
-        write_tags(&mut file, &mut sink(), tagset! {}).unwrap();
+        let file = File::open(path).unwrap();
+        write_tags(&mut std::io::BufReader::new(file), &mut sink(), tagset! {}).unwrap();
     }
 }
