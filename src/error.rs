@@ -34,7 +34,4 @@ pub enum Error {
     /// reported by individual chunks.
     #[error("chunk lengths conflict with length according to RIFF header")]
     InvalidRiffLength,
-    /// The tags being written are larger than the maximum RIFF chunk size of 2^32-1 bytes.
-    #[error("size of tags overflows maximum chunk size")]
-    RiffChunkSizeOverflow,
 }

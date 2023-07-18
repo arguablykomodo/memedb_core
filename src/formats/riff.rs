@@ -27,36 +27,31 @@ use crate::{
 };
 use std::io::{Read, Seek, Write};
 
-const TAG_CHUNK: &[u8; 4] = b"meme";
+const TAGS_ID: &[u8; 4] = b"meme";
 
 /// Given a `src`, return the tags contained inside.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
-    skip(src, MAGIC.len() as i64)?;
-    let mut file_length = u32::from_le_bytes(read_stack::<4>(src)?);
-    skip(src, 4)?;
-    file_length = file_length.checked_sub(4).ok_or(Error::InvalidRiffLength)?;
-    while file_length > 0 {
-        let name = read_stack::<4>(src)?;
-        let length = u32::from_le_bytes(read_stack::<4>(src)?);
-        if &name == TAG_CHUNK {
-            let mut tags = TagSet::new();
-            let mut tag_src = src.take(length as u64);
-            while let Some(n) = or_eof(read_byte(&mut tag_src))? {
-                let tag = read_heap(&mut tag_src, n as usize)?;
-                tags.insert(String::from_utf8(tag)?);
+    let _ = read_stack::<12>(src)?; // We dont care about them, but they have to be there
+    while let Some(chunk_id) = or_eof(read_stack::<4>(src))? {
+        let chunk_size = u32::from_le_bytes(read_stack::<4>(src)?);
+        match &chunk_id {
+            TAGS_ID => {
+                let mut tags = TagSet::new();
+                let mut data = src.take(chunk_size as u64);
+                while let Some(n) = or_eof(read_byte(&mut data))? {
+                    tags.insert(String::from_utf8(read_heap(&mut data, n as usize)?)?);
+                }
+                return Ok(tags);
             }
-            return Ok(tags);
+            _ => {
+                skip(src, chunk_size as i64)?;
+                if chunk_size & 1 == 1 {
+                    skip(src, 1)?;
+                }
+            }
         }
-        skip(src, length as i64)?;
-        if (length & 1) == 1 {
-            skip(src, 1)?;
-            file_length = file_length.checked_sub(1).ok_or(Error::InvalidRiffLength)?;
-        }
-        // Name + length + payload
-        file_length = file_length.checked_sub(4 + 4).ok_or(Error::InvalidRiffLength)?;
-        file_length = file_length.checked_sub(length).ok_or(Error::InvalidRiffLength)?;
     }
-    Ok(TagSet::new())
+    return Ok(TagSet::new());
 }
 
 /// Read data from `src`, set the provided `tags`, and write to `dest`.
@@ -67,70 +62,47 @@ pub fn write_tags(
     dest: &mut impl Write,
     tags: TagSet,
 ) -> Result<(), Error> {
-    skip(src, MAGIC.len() as i64)?;
-    dest.write_all(MAGIC)?;
-
-    let mut file_length = u32::from_le_bytes(read_stack::<4>(src)?);
-
-    // Because we need to write the length of the file at the beggining, we need to store
-    // everything in a buffer before writing. Those four 0x0 bytes are placeholders for the final
-    // length
-    let mut buffer = vec![0, 0, 0, 0];
-
-    passthrough(src, &mut buffer, 4)?;
-    file_length = file_length.checked_sub(4).ok_or(Error::InvalidRiffLength)?;
-
-    while file_length > 0 {
-        let name = read_stack::<4>(src)?;
-        let chunk_length_bytes = read_stack::<4>(src)?;
-        let chunk_length = u32::from_le_bytes(chunk_length_bytes);
-        if &name == TAG_CHUNK {
-            skip(src, chunk_length as i64)?;
-            if (chunk_length & 1) == 1 {
-                skip(src, 1)?;
-                file_length = file_length.checked_sub(1).ok_or(Error::InvalidRiffLength)?;
+    passthrough(src, dest, 4)?;
+    skip(src, 4)?;
+    let mut data = Vec::new();
+    passthrough(src, &mut data, 4)?;
+    while let Some(chunk_id) = or_eof(read_stack::<4>(src))? {
+        let chunk_size_bytes = read_stack::<4>(src)?;
+        let chunk_size = u32::from_le_bytes(chunk_size_bytes);
+        match &chunk_id {
+            TAGS_ID => {
+                skip(src, chunk_size as i64)?;
+                if chunk_size & 1 == 1 {
+                    skip(src, 1)?;
+                }
             }
-        } else {
-            buffer.extend_from_slice(&name);
-            buffer.extend_from_slice(&chunk_length_bytes);
-            passthrough(src, &mut buffer, chunk_length as u64)?;
-            if (chunk_length & 1) == 1 {
-                buffer.push(0);
-                file_length = file_length.checked_sub(1).ok_or(Error::InvalidRiffLength)?;
+            _ => {
+                data.write_all(&chunk_id)?;
+                data.write_all(&chunk_size_bytes)?;
+                if passthrough(src, &mut data, chunk_size as u64)? != chunk_size as u64 {
+                    return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))?;
+                };
+                if chunk_size & 1 == 1 {
+                    dest.write_all(&[0])?;
+                }
             }
         }
-        // Name + length + payload
-        file_length = file_length.checked_sub(4 + 4).ok_or(Error::InvalidRiffLength)?;
-        file_length = file_length.checked_sub(chunk_length).ok_or(Error::InvalidRiffLength)?;
     }
-
-    // We have to store the tags at the end because webp wants the chunks to be in a specific order
-    // So yeah, thanks webp
     let mut tags: Vec<_> = tags.into_iter().collect();
     tags.sort_unstable();
-    let tag_bytes = tags.into_iter().fold(Vec::new(), |mut acc, tag| {
+    let tags = tags.into_iter().fold(Vec::new(), |mut acc, tag| {
         acc.push(tag.len() as u8);
-        acc.extend(tag.into_bytes());
+        acc.append(&mut tag.into_bytes());
         acc
     });
-
-    let tags_length = tag_bytes.len() as u32;
-    buffer.extend_from_slice(TAG_CHUNK);
-    buffer.extend(tags_length.to_le_bytes().iter());
-    buffer.extend(tag_bytes.into_iter());
-    if (tags_length & 1) == 1 {
-        buffer.push(0);
+    data.write_all(TAGS_ID)?;
+    data.write_all(&(tags.len() as u32).to_le_bytes())?;
+    data.write_all(&tags)?;
+    if tags.len() & 1 == 1 {
+        data.write_all(&[0])?;
     }
-
-    // We subtract 4 here because the bytes storing the size are not counted
-    let final_length = (buffer.len() as u32 - 4).to_le_bytes();
-    buffer[0] = final_length[0]; // THIS
-    buffer[1] = final_length[1]; // IS
-    buffer[2] = final_length[2]; // VERY
-    buffer[3] = final_length[3]; // DUMB
-
-    dest.write_all(&buffer)?;
-
+    dest.write_all(&(data.len() as u32).to_le_bytes())?;
+    dest.write_all(&data)?;
     Ok(())
 }
 
