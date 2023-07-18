@@ -51,7 +51,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
             }
         }
     }
-    return Ok(TagSet::new());
+    Ok(TagSet::new())
 }
 
 /// Read data from `src`, set the provided `tags`, and write to `dest`.
