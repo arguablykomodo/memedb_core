@@ -13,25 +13,17 @@ pub enum Error {
     /// The tags being read do not constitute a valid UTF-8 string.
     #[error("tags are not valid UTF-8")]
     Utf8(#[from] std::string::FromUtf8Error),
-
     /// An unknown GIF block was found. Possible blocks are:
     ///
     /// - Extension block (`0x21`)
     /// - Image Descriptor block (`0x2C`)
     /// - End Of File block (`0x3B`)
-    #[error("unknown GIF block found, expected one of 0x21, 0x2C, or 0x3B, but found {0:X}")]
+    #[error("unknown GIF block found, expected one of 0x21, 0x2C, or 0x3B, but found {0:02X}")]
     GifUnknownBlock(u8),
-
     /// An invalid JPEG marker was found.
-    #[error("0x00 byte found where marker was expected")]
-    JpegInvalidMarker,
-
+    #[error("invalid JPEG marker found, excpected anything but 0x00 or 0xFF, but found {0:02X}")]
+    JpegInvalidMarker(u8),
     /// There is a mismatch between the calculated CRC-32 hash and the one found in the block.
     #[error("corrupted tags in PNG data")]
     PngChecksum,
-
-    /// The header of the RIFF file declares a file length that is smaller than the sum of lengths
-    /// reported by individual chunks.
-    #[error("chunk lengths conflict with length according to RIFF header")]
-    InvalidRiffLength,
 }

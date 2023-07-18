@@ -67,8 +67,9 @@ fn passthrough_ecs(src: &mut (impl Read + BufRead), dest: &mut impl Write) -> Re
 }
 
 fn read_marker(src: &mut (impl Read + Seek)) -> Result<u8, Error> {
-    if read_byte(src)? != 0xFF {
-        return Err(Error::JpegInvalidMarker);
+    let byte = read_byte(src)?;
+    if byte != 0xFF {
+        return Err(Error::JpegInvalidMarker(byte));
     }
     loop {
         match read_byte(src)? {
@@ -100,7 +101,7 @@ pub fn read_tags(src: &mut (impl Read + BufRead + Seek)) -> Result<TagSet, Error
             }
             0xD9 => return Ok(TagSet::new()),
 
-            0x00 => return Err(Error::JpegInvalidMarker),
+            0x00 => return Err(Error::JpegInvalidMarker(marker)),
             0x01 | 0xD0..=0xD9 => {}
             0x02..=0xCF | 0xDA..=0xFE => {
                 let length = u16::from_be_bytes(read_stack::<2>(src)?).saturating_sub(2);
@@ -163,7 +164,7 @@ pub fn write_tags(
                 return Ok(());
             }
 
-            0x00 => return Err(Error::JpegInvalidMarker),
+            0x00 => return Err(Error::JpegInvalidMarker(marker)),
             0x01 | 0xD0..=0xD9 => dest.write_all(&[0xFF, marker])?,
             0x02..=0xCF | 0xDA..=0xFE => {
                 let length_bytes = read_stack::<2>(src)?;
