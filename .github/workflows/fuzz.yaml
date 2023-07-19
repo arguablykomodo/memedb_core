@@ -1,6 +1,7 @@
 on:
+  workflow_call:
   schedule:
-    - cron: '04 19 * * *'
+    - cron: '13 04 * * 6'
 name: Fuzz testing
 jobs:
   fuzz:
@@ -23,7 +24,8 @@ jobs:
       - uses: actions/cache@v3
         with:
           path: fuzz/corpus/
-          key: fuzz-corpus-${{ matrix.format }}
+          key: fuzz-corpus-${{ matrix.format }}-${{ github.run_id }}
+          restore-keys: fuzz-corpus-${{ matrix.format }}
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly

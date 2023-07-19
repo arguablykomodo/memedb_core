@@ -33,3 +33,7 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
+  fuzz:
+    needs:
+      - ci
+    uses: ./.github/workflows/fuzz.yaml
