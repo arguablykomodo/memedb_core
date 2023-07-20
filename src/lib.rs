@@ -24,24 +24,6 @@ pub use error::Error;
 pub use formats::*;
 use std::io::{BufRead, Read, Seek, Write};
 
-type TagSet = std::collections::HashSet<String>;
-
-/// Utility macro for quickly creating tagsets.
-///
-/// ```
-/// # use memedb_core::tagset;
-/// let tagset = tagset!{ "foo", "bar" };
-/// ```
-#[macro_export]
-macro_rules! tagset {
-    {} => { std::collections::HashSet::new() };
-    {$($tag:expr),*} => {{
-        let mut tagset = std::collections::HashSet::new();
-        $(tagset.insert(String::from($tag));)*
-        tagset
-    }};
-}
-
 /// Checks if a tag is valid.
 ///
 /// Current restrictions:
@@ -58,15 +40,15 @@ pub fn is_tag_valid(tag: impl AsRef<str>) -> bool {
 /// Checks if a set of tags are valid.
 ///
 /// Take a look at the documentation of [`is_tag_valid`](crate::is_tag_valid) for more information.
-pub fn are_tags_valid(tags: &TagSet) -> bool {
-    tags.iter().all(is_tag_valid)
+pub fn are_tags_valid(tags: impl IntoIterator<Item = impl AsRef<str>>) -> bool {
+    tags.into_iter().all(is_tag_valid)
 }
 
 /// Given a `src`, return the tags (if any) contained inside.
 ///
 /// This function operates by first calling [`identify_format`](crate::identify_format), and then
 /// calling the corresponding `read_tags` function if successful.
-pub fn read_tags(src: &mut (impl Read + BufRead + Seek)) -> Result<Option<TagSet>, Error> {
+pub fn read_tags(src: &mut (impl Read + BufRead + Seek)) -> Result<Option<Vec<String>>, Error> {
     if let Some(format) = identify_format(src)? {
         src.seek(std::io::SeekFrom::Start(0))?;
         let tags = match format {
@@ -96,8 +78,9 @@ pub fn read_tags(src: &mut (impl Read + BufRead + Seek)) -> Result<Option<TagSet
 pub fn write_tags(
     src: &mut (impl Read + BufRead + Seek),
     dest: &mut impl Write,
-    tags: TagSet,
+    tags: impl IntoIterator<Item = impl AsRef<str>>,
 ) -> Result<Option<()>, Error> {
+    let tags: Vec<_> = tags.into_iter().collect();
     if are_tags_valid(&tags) {
         if let Some(format) = identify_format(src)? {
             src.seek(std::io::SeekFrom::Start(0))?;

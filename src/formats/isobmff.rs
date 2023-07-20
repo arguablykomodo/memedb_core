@@ -24,7 +24,7 @@ pub(crate) const OFFSET: usize = 4;
 
 use crate::{
     utils::{or_eof, passthrough, read_byte, read_heap, read_stack, skip},
-    Error, TagSet,
+    Error,
 };
 use std::io::{Read, Seek, Write};
 
@@ -111,18 +111,18 @@ impl Box {
 }
 
 /// Given a `src`, return the tags contained inside.
-pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
+pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
     while let Some(r#box) = or_eof(Box::read(src))? {
         if let Size::Short(0) = r#box.size {
-            return Ok(TagSet::new());
+            return Ok(Vec::new());
         }
         match r#box.r#type {
             Type::Long(MEMEDB_UUID) => {
-                let mut tags = TagSet::new();
+                let mut tags = Vec::new();
                 let mut tag_src = src.take(r#box.data_size());
                 while let Some(n) = or_eof(read_byte(&mut tag_src))? {
                     let tag = read_heap(&mut tag_src, n as usize)?;
-                    tags.insert(String::from_utf8(tag)?);
+                    tags.push(String::from_utf8(tag)?);
                 }
                 return Ok(tags);
             }
@@ -135,7 +135,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
             }
         };
     }
-    Ok(TagSet::new())
+    Ok(Vec::new())
 }
 
 /// Read data from `src`, set the provided `tags`, and write to `dest`.
@@ -144,7 +144,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
 pub fn write_tags(
     src: &mut (impl Read + Seek),
     dest: &mut impl Write,
-    tags: TagSet,
+    tags: impl IntoIterator<Item = impl AsRef<str>>,
 ) -> Result<(), Error> {
     while let Some(r#box) = or_eof(Box::read(src))? {
         if let Size::Short(0) = r#box.size {
@@ -168,11 +168,9 @@ pub fn write_tags(
         };
     }
 
-    let mut tags: Vec<_> = tags.into_iter().collect();
-    tags.sort_unstable();
     let tags = tags.into_iter().fold(Vec::new(), |mut acc, tag| {
-        acc.push(tag.len() as u8);
-        acc.append(&mut tag.into_bytes());
+        acc.push(tag.as_ref().len() as u8);
+        acc.extend(tag.as_ref().as_bytes());
         acc
     });
     let r#box = Box::new(Type::Long(MEMEDB_UUID), tags.len() as u64);

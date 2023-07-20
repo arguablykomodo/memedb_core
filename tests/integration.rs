@@ -1,4 +1,4 @@
-use memedb_core::{read_tags, tagset, write_tags};
+use memedb_core::{read_tags, write_tags};
 use std::{fs::File, io::sink, path::Path};
 
 #[test]
@@ -17,6 +17,6 @@ fn write() {
     for file in path.read_dir().unwrap() {
         let path = file.unwrap().path();
         let file = File::open(path).unwrap();
-        write_tags(&mut std::io::BufReader::new(file), &mut sink(), tagset! {}).unwrap();
+        write_tags(&mut std::io::BufReader::new(file), &mut sink(), &[] as &[&str]).unwrap();
     }
 }

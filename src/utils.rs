@@ -44,7 +44,7 @@ macro_rules! standard_tests {
         #[cfg(test)]
         mod standard_tests {
             use super::{read_tags, write_tags};
-            use crate::{are_tags_valid, tagset, TagSet};
+            use crate::are_tags_valid;
             use quickcheck_macros::quickcheck;
             use std::io::{BufRead, Cursor, Read, Seek};
 
@@ -53,7 +53,10 @@ macro_rules! standard_tests {
             const TAGGED: &[u8] = include_bytes!(concat!("../../tests/media/minimal_tagged.", $e));
             const LARGE: &[u8] = include_bytes!(concat!("../../tests/media/large.", $e));
 
-            fn write(src: &mut (impl Read + BufRead + Seek), tags: TagSet) -> Vec<u8> {
+            fn write(
+                src: &mut (impl Read + BufRead + Seek),
+                tags: impl IntoIterator<Item = impl AsRef<str>>,
+            ) -> Vec<u8> {
                 let mut buf = Vec::new();
                 write_tags(src, &mut buf, tags).unwrap();
                 buf
@@ -61,25 +64,25 @@ macro_rules! standard_tests {
 
             #[test]
             fn untagged() {
-                assert_eq!(read_tags(&mut Cursor::new(&UNTAGGED)).unwrap(), tagset! {});
-                assert_eq!(write(&mut Cursor::new(&UNTAGGED), tagset! { "foo", "bar" }), TAGGED);
+                assert_eq!(read_tags(&mut Cursor::new(&UNTAGGED)).unwrap(), &[] as &[&str]);
+                assert_eq!(write(&mut Cursor::new(&UNTAGGED), &["bar", "foo"]), TAGGED);
             }
 
             #[test]
             fn empty() {
-                assert_eq!(read_tags(&mut Cursor::new(&EMPTY)).unwrap(), tagset! {});
-                assert_eq!(write(&mut Cursor::new(&EMPTY), tagset! { "foo", "bar" }), TAGGED);
+                assert_eq!(read_tags(&mut Cursor::new(&EMPTY)).unwrap(), &[] as &[&str]);
+                assert_eq!(write(&mut Cursor::new(&EMPTY), &["bar", "foo"]), TAGGED);
             }
 
             #[test]
             fn tagged() {
-                assert_eq!(read_tags(&mut Cursor::new(&TAGGED)).unwrap(), tagset! { "foo", "bar" });
-                assert_eq!(write(&mut Cursor::new(&TAGGED), tagset! {}), EMPTY);
+                assert_eq!(read_tags(&mut Cursor::new(&TAGGED)).unwrap(), &["bar", "foo"]);
+                assert_eq!(write(&mut Cursor::new(&TAGGED), &[] as &[&str]), EMPTY);
             }
 
             #[test]
             fn large() {
-                assert_eq!(read_tags(&mut Cursor::new(&LARGE)).unwrap(), tagset! {});
+                assert_eq!(read_tags(&mut Cursor::new(&LARGE)).unwrap(), &[] as &[&str]);
             }
 
             #[quickcheck]
@@ -89,7 +92,7 @@ macro_rules! standard_tests {
             }
 
             #[quickcheck]
-            fn qc_write_never_panics(bytes: Vec<u8>, tags: TagSet) -> bool {
+            fn qc_write_never_panics(bytes: Vec<u8>, tags: Vec<String>) -> bool {
                 if are_tags_valid(&tags) {
                     let _ = write_tags(&mut Cursor::new(&bytes), &mut std::io::sink(), tags);
                 }
@@ -97,7 +100,7 @@ macro_rules! standard_tests {
             }
 
             #[quickcheck]
-            fn qc_identity(bytes: Vec<u8>, tags: TagSet) -> bool {
+            fn qc_identity(bytes: Vec<u8>, tags: Vec<String>) -> bool {
                 if are_tags_valid(&tags) && read_tags(&mut Cursor::new(&bytes)).is_ok() {
                     let mut dest = Vec::new();
                     if write_tags(&mut Cursor::new(bytes), &mut dest, tags.clone()).is_ok() {

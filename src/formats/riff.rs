@@ -23,23 +23,23 @@ pub(crate) const OFFSET: usize = 0;
 
 use crate::{
     utils::{or_eof, passthrough, read_byte, read_heap, read_stack, skip},
-    Error, TagSet,
+    Error,
 };
 use std::io::{Read, Seek, Write};
 
 const TAGS_ID: &[u8; 4] = b"meme";
 
 /// Given a `src`, return the tags contained inside.
-pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
+pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
     let _ = read_stack::<12>(src)?; // We dont care about them, but they have to be there
     while let Some(chunk_id) = or_eof(read_stack::<4>(src))? {
         let chunk_size = u32::from_le_bytes(read_stack::<4>(src)?);
         match &chunk_id {
             TAGS_ID => {
-                let mut tags = TagSet::new();
+                let mut tags = Vec::new();
                 let mut data = src.take(chunk_size as u64);
                 while let Some(n) = or_eof(read_byte(&mut data))? {
-                    tags.insert(String::from_utf8(read_heap(&mut data, n as usize)?)?);
+                    tags.push(String::from_utf8(read_heap(&mut data, n as usize)?)?);
                 }
                 return Ok(tags);
             }
@@ -51,7 +51,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
             }
         }
     }
-    Ok(TagSet::new())
+    Ok(Vec::new())
 }
 
 /// Read data from `src`, set the provided `tags`, and write to `dest`.
@@ -60,7 +60,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
 pub fn write_tags(
     src: &mut (impl Read + Seek),
     dest: &mut impl Write,
-    tags: TagSet,
+    tags: impl IntoIterator<Item = impl AsRef<str>>,
 ) -> Result<(), Error> {
     passthrough(src, dest, 4)?;
     skip(src, 4)?;
@@ -88,11 +88,9 @@ pub fn write_tags(
             }
         }
     }
-    let mut tags: Vec<_> = tags.into_iter().collect();
-    tags.sort_unstable();
     let tags = tags.into_iter().fold(Vec::new(), |mut acc, tag| {
-        acc.push(tag.len() as u8);
-        acc.append(&mut tag.into_bytes());
+        acc.push(tag.as_ref().len() as u8);
+        acc.extend(tag.as_ref().as_bytes());
         acc
     });
     data.write_all(TAGS_ID)?;

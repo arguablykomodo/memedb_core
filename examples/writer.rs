@@ -3,7 +3,7 @@
 fn main() {
     let mut args = std::env::args().skip(1);
     let path = args.next().unwrap();
-    let tags: std::collections::HashSet<String> = args.collect();
+    let tags: Vec<String> = args.collect();
 
     use std::io::Read;
     let mut file = std::fs::File::open(&path).unwrap();

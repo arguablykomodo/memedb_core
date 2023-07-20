@@ -28,7 +28,7 @@ pub(crate) const OFFSET: usize = 0;
 
 use crate::{
     utils::{passthrough, read_byte, read_heap, skip},
-    Error, TagSet,
+    Error,
 };
 use std::io::{Read, Seek, Write};
 
@@ -53,7 +53,7 @@ fn passthrough_blocks(src: &mut impl Read, dest: &mut impl Write) -> Result<(), 
 }
 
 /// Given a `src`, return the tags contained inside.
-pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
+pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
     skip(src, MAGIC.len() as i64 + 4)?;
     let packed = read_byte(src)?;
     skip(src, 2)?;
@@ -68,14 +68,14 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
                     let size = read_byte(src)?;
                     let identifier = read_heap(src, size as usize)?;
                     if identifier == IDENTIFIER {
-                        let mut tags = TagSet::new();
+                        let mut tags = Vec::new();
                         loop {
                             let tag_length = read_byte(src)?;
                             if tag_length == 0 {
                                 return Ok(tags);
                             } else {
                                 let tag_bytes = read_heap(src, tag_length as usize)?;
-                                tags.insert(String::from_utf8(tag_bytes)?);
+                                tags.push(String::from_utf8(tag_bytes)?);
                             }
                         }
                     }
@@ -91,7 +91,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
                 skip(src, 1)?;
                 passthrough_blocks(src, &mut std::io::sink())?;
             }
-            0x3B => return Ok(TagSet::new()),
+            0x3B => return Ok(Vec::new()),
             byte => return Err(Error::GifUnknownBlock(byte)),
         }
     }
@@ -103,7 +103,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
 pub fn write_tags(
     src: &mut (impl Read + Seek),
     dest: &mut impl Write,
-    tags: TagSet,
+    tags: impl IntoIterator<Item = impl AsRef<str>>,
 ) -> Result<(), Error> {
     passthrough(src, dest, MAGIC.len() as u64 + 4)?;
     let packed = read_byte(src)?;
@@ -114,11 +114,9 @@ pub fn write_tags(
     }
     dest.write_all(&[0x21, 0xFF, 0x0B])?;
     dest.write_all(IDENTIFIER)?;
-    let mut tags: Vec<String> = tags.iter().cloned().collect();
-    tags.sort_unstable();
-    for tag in &mut tags {
-        dest.write_all(&[tag.len() as u8])?;
-        dest.write_all(tag.as_bytes())?;
+    for tag in tags {
+        dest.write_all(&[tag.as_ref().len() as u8])?;
+        dest.write_all(tag.as_ref().as_bytes())?;
     }
     dest.write_all(&[0])?;
     loop {

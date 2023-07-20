@@ -23,7 +23,7 @@ pub(crate) const OFFSET: usize = 0;
 
 use crate::{
     utils::{or_eof, passthrough, read_byte, read_heap, read_stack, skip},
-    Error, TagSet,
+    Error,
 };
 use std::io::{Read, Seek, Write};
 
@@ -33,23 +33,23 @@ const END_CHUNK: &[u8; 4] = b"IEND";
 const CRC: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_ISO_HDLC);
 
 /// Given a `src`, return the tags contained inside.
-pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
+pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
     skip(src, MAGIC.len() as i64)?;
     loop {
         let chunk_length = u32::from_be_bytes(read_stack::<4>(src)?);
         let chunk_type = read_stack::<4>(src)?;
         match &chunk_type {
-            END_CHUNK => return Ok(TagSet::new()),
+            END_CHUNK => return Ok(Vec::new()),
             TAG_CHUNK => {
                 let mut digest = CRC.digest();
                 digest.update(&chunk_type);
-                let mut tags = TagSet::new();
+                let mut tags = Vec::new();
                 let mut data = src.take(chunk_length as u64);
                 while let Some(n) = or_eof(read_byte(&mut data))? {
                     let tag = read_heap(&mut data, n as usize)?;
                     digest.update(&[n]);
                     digest.update(&tag);
-                    tags.insert(String::from_utf8(tag)?);
+                    tags.push(String::from_utf8(tag)?);
                 }
                 let checksum = u32::from_be_bytes(read_stack::<4>(src)?);
                 if checksum != digest.finalize() {
@@ -70,7 +70,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<TagSet, Error> {
 pub fn write_tags(
     src: &mut (impl Read + Seek),
     dest: &mut impl Write,
-    tags: TagSet,
+    tags: impl IntoIterator<Item = impl AsRef<str>>,
 ) -> Result<(), Error> {
     passthrough(src, dest, MAGIC.len() as u64)?;
     // Passthrough first IHDR chunk
@@ -82,14 +82,12 @@ pub fn write_tags(
 
     let mut digest = CRC.digest();
     digest.update(TAG_CHUNK);
-    let mut tags: Vec<_> = tags.into_iter().collect();
-    tags.sort_unstable();
     let tags = tags.into_iter().fold(Vec::new(), |mut acc, tag| {
-        let mut tag = tag.into_bytes();
+        let tag = tag.as_ref().as_bytes();
         digest.update(&[tag.len() as u8]);
-        digest.update(&tag);
+        digest.update(tag);
         acc.push(tag.len() as u8);
-        acc.append(&mut tag);
+        acc.extend(tag);
         acc
     });
     dest.write_all(&(tags.len() as u32).to_be_bytes())?;
