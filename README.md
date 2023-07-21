@@ -1,7 +1,7 @@
 # MemeDB Core
 
-A Rust library for reading and writing tags to media streams. It works by
-extending media formats to add custom metadata.
+A Rust library for reading and writing tags (lists of strings) to media
+streams. It works by extending media formats to add custom metadata.
 
 ## Supported Formats
 
