@@ -27,7 +27,7 @@ pub(crate) const MAGIC: &[u8] = b"GIF89a";
 pub(crate) const OFFSET: usize = 0;
 
 use crate::{
-    utils::{passthrough, read_byte, read_heap, skip},
+    utils::{decode_tags, encode_tags, passthrough, read_byte, read_heap, skip},
     Error,
 };
 use std::io::{Read, Seek, Write};
@@ -68,16 +68,18 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
                     let size = read_byte(src)?;
                     let identifier = read_heap(src, size as usize)?;
                     if identifier == IDENTIFIER {
-                        let mut tags = Vec::new();
+                        let mut tags_bytes = Vec::new();
+                        let mut n = read_byte(src)?;
                         loop {
-                            let tag_length = read_byte(src)?;
-                            if tag_length == 0 {
-                                return Ok(tags);
+                            if n == 0 {
+                                break;
                             } else {
-                                let tag_bytes = read_heap(src, tag_length as usize)?;
-                                tags.push(String::from_utf8(tag_bytes)?);
+                                let buf = read_heap(src, n as usize + 1)?;
+                                tags_bytes.write_all(&buf[..n as usize])?;
+                                n = *buf.last().unwrap();
                             }
                         }
+                        return decode_tags(&mut tags_bytes.as_slice());
                     }
                 }
                 passthrough_blocks(src, &mut std::io::sink())?;
@@ -112,11 +114,16 @@ pub fn write_tags(
     if packed >> 7 == 1 {
         passthrough(src, dest, color_table_size(packed) as u64)?;
     }
-    dest.write_all(&[0x21, 0xFF, 0x0B])?;
+    dest.write_all(&[0x21, 0xFF, IDENTIFIER.len() as u8])?;
     dest.write_all(IDENTIFIER)?;
-    for tag in tags {
-        dest.write_all(&[tag.as_ref().len() as u8])?;
-        dest.write_all(tag.as_ref().as_bytes())?;
+    let mut tag_bytes = Vec::new();
+    encode_tags(tags, &mut tag_bytes)?;
+    let mut tag_slice = tag_bytes.as_slice();
+    while !tag_slice.is_empty() {
+        let sub_block_size = tag_slice.len().min(0xFF);
+        dest.write_all(&[sub_block_size as u8])?;
+        dest.write_all(&tag_slice[0..sub_block_size])?;
+        tag_slice = &tag_slice[sub_block_size..];
     }
     dest.write_all(&[0])?;
     loop {

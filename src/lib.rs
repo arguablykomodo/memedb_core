@@ -24,26 +24,6 @@ pub use error::Error;
 pub use formats::*;
 use std::io::{BufRead, Read, Seek, Write};
 
-/// Checks if a tag is valid.
-///
-/// Current restrictions:
-///
-/// - The tag cannot be an empty string.
-/// - The tag cannot have a size higher than 256 bytes.
-///
-/// When writing tags, the library will call this function automatically and return an error if
-/// appropriate.
-pub fn is_tag_valid(tag: impl AsRef<str>) -> bool {
-    !(tag.as_ref().is_empty() || tag.as_ref().len() > 0xFF)
-}
-
-/// Checks if a set of tags are valid.
-///
-/// Take a look at the documentation of [`is_tag_valid`](crate::is_tag_valid) for more information.
-pub fn are_tags_valid(tags: impl IntoIterator<Item = impl AsRef<str>>) -> bool {
-    tags.into_iter().all(is_tag_valid)
-}
-
 /// Given a `src`, return the tags (if any) contained inside.
 ///
 /// This function operates by first calling [`identify_format`](crate::identify_format), and then
@@ -80,27 +60,22 @@ pub fn write_tags(
     dest: &mut impl Write,
     tags: impl IntoIterator<Item = impl AsRef<str>>,
 ) -> Result<Option<()>, Error> {
-    let tags: Vec<_> = tags.into_iter().collect();
-    if are_tags_valid(&tags) {
-        if let Some(format) = identify_format(src)? {
-            src.seek(std::io::SeekFrom::Start(0))?;
-            match format {
-                #[cfg(feature = "gif")]
-                Format::Gif => gif::write_tags(src, dest, tags)?,
-                #[cfg(feature = "isobmff")]
-                Format::Isobmff => isobmff::write_tags(src, dest, tags)?,
-                #[cfg(feature = "jpeg")]
-                Format::Jpeg => jpeg::write_tags(src, dest, tags)?,
-                #[cfg(feature = "png")]
-                Format::Png => png::write_tags(src, dest, tags)?,
-                #[cfg(feature = "riff")]
-                Format::Riff => riff::write_tags(src, dest, tags)?,
-            };
-            Ok(Some(()))
-        } else {
-            Ok(None)
-        }
+    if let Some(format) = identify_format(src)? {
+        src.seek(std::io::SeekFrom::Start(0))?;
+        match format {
+            #[cfg(feature = "gif")]
+            Format::Gif => gif::write_tags(src, dest, tags)?,
+            #[cfg(feature = "isobmff")]
+            Format::Isobmff => isobmff::write_tags(src, dest, tags)?,
+            #[cfg(feature = "jpeg")]
+            Format::Jpeg => jpeg::write_tags(src, dest, tags)?,
+            #[cfg(feature = "png")]
+            Format::Png => png::write_tags(src, dest, tags)?,
+            #[cfg(feature = "riff")]
+            Format::Riff => riff::write_tags(src, dest, tags)?,
+        };
+        Ok(Some(()))
     } else {
-        Err(error::Error::InvalidTags)
+        Ok(None)
     }
 }

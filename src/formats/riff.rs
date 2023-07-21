@@ -22,7 +22,7 @@ pub(crate) const MAGIC: &[u8] = b"RIFF";
 pub(crate) const OFFSET: usize = 0;
 
 use crate::{
-    utils::{or_eof, passthrough, read_byte, read_heap, read_stack, skip},
+    utils::{decode_tags, encode_tags, or_eof, passthrough, read_stack, skip},
     Error,
 };
 use std::io::{Read, Seek, Write};
@@ -35,14 +35,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
     while let Some(chunk_id) = or_eof(read_stack::<4>(src))? {
         let chunk_size = u32::from_le_bytes(read_stack::<4>(src)?);
         match &chunk_id {
-            TAGS_ID => {
-                let mut tags = Vec::new();
-                let mut data = src.take(chunk_size as u64);
-                while let Some(n) = or_eof(read_byte(&mut data))? {
-                    tags.push(String::from_utf8(read_heap(&mut data, n as usize)?)?);
-                }
-                return Ok(tags);
-            }
+            TAGS_ID => return decode_tags(src),
             _ => {
                 skip(src, chunk_size as i64)?;
                 if chunk_size & 1 == 1 {
@@ -88,15 +81,12 @@ pub fn write_tags(
             }
         }
     }
-    let tags = tags.into_iter().fold(Vec::new(), |mut acc, tag| {
-        acc.push(tag.as_ref().len() as u8);
-        acc.extend(tag.as_ref().as_bytes());
-        acc
-    });
+    let mut tags_bytes = Vec::new();
+    encode_tags(tags, &mut tags_bytes)?;
     data.write_all(TAGS_ID)?;
-    data.write_all(&(tags.len() as u32).to_le_bytes())?;
-    data.write_all(&tags)?;
-    if tags.len() & 1 == 1 {
+    data.write_all(&(tags_bytes.len() as u32).to_le_bytes())?;
+    data.write_all(&tags_bytes)?;
+    if tags_bytes.len() & 1 == 1 {
         data.write_all(&[0])?;
     }
     dest.write_all(&(data.len() as u32).to_le_bytes())?;

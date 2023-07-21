@@ -3,10 +3,6 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 /// A possible error returned by a `read_tags` or `write_tags` function.
 pub enum Error {
-    /// The tags provided are invalid (check the documentation of
-    /// [`is_tag_valid`][crate::is_tag_valid] for more information)
-    #[error("tags are not valid")]
-    InvalidTags,
     /// There was an IO error while reading or writing the tags.
     #[error("io error")]
     Io(#[from] std::io::Error),

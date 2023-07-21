@@ -23,7 +23,7 @@ pub(crate) const MAGIC: &[u8] = b"ftyp";
 pub(crate) const OFFSET: usize = 4;
 
 use crate::{
-    utils::{or_eof, passthrough, read_byte, read_heap, read_stack, skip},
+    utils::{decode_tags, encode_tags, or_eof, passthrough, read_stack, skip},
     Error,
 };
 use std::io::{Read, Seek, Write};
@@ -117,15 +117,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
             return Ok(Vec::new());
         }
         match r#box.r#type {
-            Type::Long(MEMEDB_UUID) => {
-                let mut tags = Vec::new();
-                let mut tag_src = src.take(r#box.data_size());
-                while let Some(n) = or_eof(read_byte(&mut tag_src))? {
-                    let tag = read_heap(&mut tag_src, n as usize)?;
-                    tags.push(String::from_utf8(tag)?);
-                }
-                return Ok(tags);
-            }
+            Type::Long(MEMEDB_UUID) => return decode_tags(src),
             _ => {
                 let size = r#box.data_size();
                 // We passthrough instead of skip to get number of bytes read
@@ -168,14 +160,11 @@ pub fn write_tags(
         };
     }
 
-    let tags = tags.into_iter().fold(Vec::new(), |mut acc, tag| {
-        acc.push(tag.as_ref().len() as u8);
-        acc.extend(tag.as_ref().as_bytes());
-        acc
-    });
-    let r#box = Box::new(Type::Long(MEMEDB_UUID), tags.len() as u64);
+    let mut tag_bytes = Vec::new();
+    encode_tags(tags, &mut tag_bytes)?;
+    let r#box = Box::new(Type::Long(MEMEDB_UUID), tag_bytes.len() as u64);
     r#box.write(dest)?;
-    dest.write_all(&tags)?;
+    dest.write_all(&tag_bytes)?;
     Ok(())
 }
 

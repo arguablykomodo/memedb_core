@@ -31,7 +31,7 @@ pub(crate) const MAGIC: &[u8] = b"\xFF\xD8";
 pub(crate) const OFFSET: usize = 0;
 
 use crate::{
-    utils::{or_eof, passthrough, read_byte, read_heap, read_stack, skip},
+    utils::{decode_tags, encode_tags, passthrough, read_byte, read_heap, read_stack, skip},
     Error,
 };
 use std::io::{BufRead, Read, Seek, Write};
@@ -91,12 +91,7 @@ pub fn read_tags(src: &mut (impl Read + BufRead + Seek)) -> Result<Vec<String>, 
                 } else if read_heap(src, TAGS_ID.len())? != TAGS_ID {
                     skip(src, length.saturating_sub(TAGS_ID.len() as u16) as i64)?;
                 } else {
-                    let mut tags = Vec::new();
-                    let mut data = src.take(length.saturating_sub(TAGS_ID.len() as u16) as u64);
-                    while let Some(n) = or_eof(read_byte(&mut data))? {
-                        tags.push(String::from_utf8(read_heap(&mut data, n as usize)?)?);
-                    }
-                    return Ok(tags);
+                    return decode_tags(src);
                 }
             }
             0xD9 => return Ok(Vec::new()),
@@ -130,15 +125,12 @@ pub fn write_tags(
     loop {
         if !matches!(marker, 0xE0 | 0xE1) {
             if let Some(tags) = tags.take() {
-                let tags = tags.into_iter().fold(Vec::new(), |mut acc, tag| {
-                    acc.push(tag.as_ref().len() as u8);
-                    acc.extend(tag.as_ref().as_bytes());
-                    acc
-                });
+                let mut tags_bytes = Vec::new();
+                encode_tags(tags, &mut tags_bytes)?;
                 dest.write_all(&[0xFF, 0xE4])?;
-                dest.write_all(&((2 + TAGS_ID.len() + tags.len()) as u16).to_be_bytes())?;
+                dest.write_all(&((2 + TAGS_ID.len() + tags_bytes.len()) as u16).to_be_bytes())?;
                 dest.write_all(TAGS_ID)?;
-                dest.write_all(&tags)?;
+                dest.write_all(&tags_bytes)?;
             }
         }
         match marker {

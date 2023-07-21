@@ -39,12 +39,49 @@ pub fn or_eof<T>(x: Result<T, std::io::Error>) -> Result<Option<T>, std::io::Err
     }
 }
 
+pub fn encode_tags(
+    tags: impl IntoIterator<Item = impl AsRef<str>>,
+    dest: &mut impl Write,
+) -> Result<(), std::io::Error> {
+    for tag in tags {
+        let mut tag_bytes: &[u8] = tag.as_ref().as_bytes();
+        while tag_bytes.len() > 0b01111111 {
+            dest.write_all(&[0b01111111 as u8])?;
+            dest.write_all(&tag_bytes[0..0b01111111])?;
+            tag_bytes = &tag_bytes[0b01111111..];
+        }
+        dest.write_all(&[tag_bytes.len() as u8 | 0b10000000])?;
+        dest.write_all(tag_bytes)?;
+    }
+    dest.write_all(&[0b00000000])?;
+    Ok(())
+}
+
+pub fn decode_tags(src: &mut impl Read) -> Result<Vec<String>, crate::Error> {
+    let mut tags = Vec::new();
+    let mut tag_bytes = Vec::new();
+    loop {
+        let byte = read_byte(src)?;
+        match byte {
+            0b00000000 => return Ok(tags),
+            0b00000001..=0b01111111 => {
+                passthrough(src, &mut tag_bytes, byte as u64)?;
+                continue;
+            }
+            0b10000000..=0b11111111 => {
+                passthrough(src, &mut tag_bytes, (byte & 0b01111111) as u64)?;
+                tags.push(String::from_utf8(tag_bytes)?);
+                tag_bytes = Vec::new();
+            }
+        }
+    }
+}
+
 macro_rules! standard_tests {
     ($e:literal) => {
         #[cfg(test)]
         mod standard_tests {
             use super::{read_tags, write_tags};
-            use crate::are_tags_valid;
             use quickcheck_macros::quickcheck;
             use std::io::{BufRead, Cursor, Read, Seek};
 
@@ -93,15 +130,13 @@ macro_rules! standard_tests {
 
             #[quickcheck]
             fn qc_write_never_panics(bytes: Vec<u8>, tags: Vec<String>) -> bool {
-                if are_tags_valid(&tags) {
-                    let _ = write_tags(&mut Cursor::new(&bytes), &mut std::io::sink(), tags);
-                }
+                let _ = write_tags(&mut Cursor::new(&bytes), &mut std::io::sink(), tags);
                 true
             }
 
             #[quickcheck]
             fn qc_identity(bytes: Vec<u8>, tags: Vec<String>) -> bool {
-                if are_tags_valid(&tags) && read_tags(&mut Cursor::new(&bytes)).is_ok() {
+                if read_tags(&mut Cursor::new(&bytes)).is_ok() {
                     let mut dest = Vec::new();
                     if write_tags(&mut Cursor::new(bytes), &mut dest, tags.clone()).is_ok() {
                         return read_tags(&mut Cursor::new(dest)).unwrap() == tags;
