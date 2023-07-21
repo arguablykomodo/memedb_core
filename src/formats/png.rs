@@ -22,7 +22,7 @@ pub(crate) const MAGIC: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
 pub(crate) const OFFSET: usize = 0;
 
 use crate::{
-    utils::{encode_tags, passthrough, read_byte, read_stack, skip, read_heap},
+    utils::{encode_tags, passthrough, read_byte, read_heap, read_stack, skip},
     Error,
 };
 use std::io::{Read, Seek, Write};

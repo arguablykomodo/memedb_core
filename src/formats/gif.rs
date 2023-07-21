@@ -44,11 +44,10 @@ fn passthrough_blocks(src: &mut impl Read, dest: &mut impl Write) -> Result<(), 
     loop {
         if n == 0 {
             return Ok(());
-        } else {
-            let buf = read_heap(src, n as usize + 1)?;
-            n = *buf.last().unwrap();
-            dest.write_all(&buf)?;
         }
+        let buf = read_heap(src, n as usize + 1)?;
+        n = *buf.last().unwrap();
+        dest.write_all(&buf)?;
     }
 }
 
@@ -73,11 +72,10 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
                         loop {
                             if n == 0 {
                                 break;
-                            } else {
-                                let buf = read_heap(src, n as usize + 1)?;
-                                tags_bytes.write_all(&buf[..n as usize])?;
-                                n = *buf.last().unwrap();
                             }
+                            let buf = read_heap(src, n as usize + 1)?;
+                            tags_bytes.write_all(&buf[..n as usize])?;
+                            n = *buf.last().unwrap();
                         }
                         return decode_tags(&mut tags_bytes.as_slice());
                     }

@@ -49,15 +49,15 @@ fn passthrough_ecs(src: &mut (impl Read + BufRead), dest: &mut impl Write) -> Re
             dest.write_all(&buf[0..i])?;
             src.consume(i + 1);
             let mut byte = read_byte(src)?;
-            if byte != 0x00 {
+            if byte == 0x00 {
+                dest.write_all(&[0xFF, byte])?;
+            } else {
                 loop {
                     match byte {
                         0xFF => byte = read_byte(src)?,
                         byte => return Ok(byte),
                     }
                 }
-            } else {
-                dest.write_all(&[0xFF, byte])?;
             }
         } else {
             dest.write_all(buf)?;

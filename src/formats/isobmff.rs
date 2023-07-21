@@ -116,15 +116,13 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
         if let Size::Short(0) = r#box.size {
             return Ok(Vec::new());
         }
-        match r#box.r#type {
-            Type::Long(MEMEDB_UUID) => return decode_tags(src),
-            _ => {
-                let size = r#box.data_size();
-                // We passthrough instead of skip to get number of bytes read
-                if passthrough(src, &mut std::io::sink(), size)? != size {
-                    return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))?;
-                }
-            }
+        if let Type::Long(MEMEDB_UUID) = r#box.r#type {
+            return decode_tags(src);
+        }
+        let size = r#box.data_size();
+        // We passthrough instead of skip to get number of bytes read
+        if passthrough(src, &mut std::io::sink(), size)? != size {
+            return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))?;
         };
     }
     Ok(Vec::new())
@@ -149,14 +147,11 @@ pub fn write_tags(
             std::io::copy(src, dest)?;
             break;
         }
-        match r#box.r#type {
-            Type::Long(MEMEDB_UUID) => {
-                skip(src, r#box.data_size() as i64)?;
-            }
-            _ => {
-                r#box.write(dest)?;
-                passthrough(src, dest, r#box.data_size())?;
-            }
+        if let Type::Long(MEMEDB_UUID) = r#box.r#type {
+            skip(src, r#box.data_size() as i64)?;
+        } else {
+            r#box.write(dest)?;
+            passthrough(src, dest, r#box.data_size())?;
         };
     }
 

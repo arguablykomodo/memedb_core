@@ -7,6 +7,16 @@
 //! source. For more specific use cases, each module in the library exposes specific `read_tags`
 //! and `write_tags` functions for each format.
 
+#![warn(clippy::pedantic)]
+#![allow(
+    clippy::cast_lossless,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::unreadable_literal
+)]
+
 #[cfg(not(any(
     feature = "gif",
     feature = "isobmff",

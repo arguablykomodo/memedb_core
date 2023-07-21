@@ -34,14 +34,12 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
     let _ = read_stack::<12>(src)?; // We dont care about them, but they have to be there
     while let Some(chunk_id) = or_eof(read_stack::<4>(src))? {
         let chunk_size = u32::from_le_bytes(read_stack::<4>(src)?);
-        match &chunk_id {
-            TAGS_ID => return decode_tags(src),
-            _ => {
-                skip(src, chunk_size as i64)?;
-                if chunk_size & 1 == 1 {
-                    skip(src, 1)?;
-                }
-            }
+        if &chunk_id == TAGS_ID {
+            return decode_tags(src);
+        }
+        skip(src, chunk_size as i64)?;
+        if chunk_size & 1 == 1 {
+            skip(src, 1)?;
         }
     }
     Ok(Vec::new())
@@ -62,22 +60,19 @@ pub fn write_tags(
     while let Some(chunk_id) = or_eof(read_stack::<4>(src))? {
         let chunk_size_bytes = read_stack::<4>(src)?;
         let chunk_size = u32::from_le_bytes(chunk_size_bytes);
-        match &chunk_id {
-            TAGS_ID => {
-                skip(src, chunk_size as i64)?;
-                if chunk_size & 1 == 1 {
-                    skip(src, 1)?;
-                }
+        if &chunk_id == TAGS_ID {
+            skip(src, chunk_size as i64)?;
+            if chunk_size & 1 == 1 {
+                skip(src, 1)?;
             }
-            _ => {
-                data.write_all(&chunk_id)?;
-                data.write_all(&chunk_size_bytes)?;
-                if passthrough(src, &mut data, chunk_size as u64)? != chunk_size as u64 {
-                    return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))?;
-                };
-                if chunk_size & 1 == 1 {
-                    dest.write_all(&[0])?;
-                }
+        } else {
+            data.write_all(&chunk_id)?;
+            data.write_all(&chunk_size_bytes)?;
+            if passthrough(src, &mut data, chunk_size as u64)? != chunk_size as u64 {
+                return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))?;
+            };
+            if chunk_size & 1 == 1 {
+                dest.write_all(&[0])?;
             }
         }
     }

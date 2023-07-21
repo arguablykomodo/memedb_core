@@ -46,7 +46,7 @@ pub fn encode_tags(
     for tag in tags {
         let mut tag_bytes: &[u8] = tag.as_ref().as_bytes();
         while tag_bytes.len() > 0b01111111 {
-            dest.write_all(&[0b01111111 as u8])?;
+            dest.write_all(&[0b01111111])?;
             dest.write_all(&tag_bytes[0..0b01111111])?;
             tag_bytes = &tag_bytes[0b01111111..];
         }
