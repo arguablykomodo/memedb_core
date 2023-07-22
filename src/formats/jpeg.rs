@@ -66,7 +66,7 @@ fn passthrough_ecs(src: &mut (impl Read + BufRead), dest: &mut impl Write) -> Re
     }
 }
 
-fn read_marker(src: &mut (impl Read + Seek)) -> Result<u8, Error> {
+fn read_marker(src: &mut impl Read) -> Result<u8, Error> {
     let byte = read_byte(src)?;
     if byte != 0xFF {
         return Err(Error::JpegInvalidMarker(byte));
