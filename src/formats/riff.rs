@@ -66,8 +66,8 @@ pub fn write_tags(
                 skip(src, 1)?;
             }
         } else {
-            data.write_all(&chunk_id)?;
-            data.write_all(&chunk_size_bytes)?;
+            data.extend(&chunk_id);
+            data.extend(&chunk_size_bytes);
             if passthrough(src, &mut data, chunk_size as u64)? != chunk_size as u64 {
                 return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))?;
             };
@@ -78,11 +78,11 @@ pub fn write_tags(
     }
     let mut tags_bytes = Vec::new();
     encode_tags(tags, &mut tags_bytes)?;
-    data.write_all(TAGS_ID)?;
-    data.write_all(&(tags_bytes.len() as u32).to_le_bytes())?;
-    data.write_all(&tags_bytes)?;
+    data.extend(TAGS_ID);
+    data.extend(&(tags_bytes.len() as u32).to_le_bytes());
+    data.extend(&tags_bytes);
     if tags_bytes.len() & 1 == 1 {
-        data.write_all(&[0])?;
+        data.push(0);
     }
     dest.write_all(&(data.len() as u32).to_le_bytes())?;
     dest.write_all(&data)?;

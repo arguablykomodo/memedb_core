@@ -74,7 +74,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
                                 break;
                             }
                             let buf = read_heap(src, n as usize + 1)?;
-                            tags_bytes.write_all(&buf[..n as usize])?;
+                            tags_bytes.extend(&buf[..n as usize]);
                             n = *buf.last().unwrap();
                         }
                         return decode_tags(&mut tags_bytes.as_slice());
