@@ -22,12 +22,34 @@ pub(crate) const MAGIC: &[u8] = b"RIFF";
 pub(crate) const OFFSET: usize = 0;
 
 use crate::{
-    utils::{decode_tags, encode_tags, or_eof, passthrough, read_stack, skip},
+    utils::{
+        decode_tags, decode_tags_async, encode_tags, encode_tags_async, or_eof, passthrough,
+        passthrough_async, read_stack, read_stack_async, skip, skip_async,
+    },
     Error,
 };
+use futures::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use std::io::{Read, Seek, Write};
 
 const TAGS_ID: &[u8; 4] = b"meme";
+
+/// Given a `src`, return the tags contained inside.
+pub async fn read_tags_async(
+    src: &mut (impl AsyncReadExt + AsyncSeekExt + Unpin),
+) -> Result<Vec<String>, Error> {
+    let _ = read_stack_async::<12>(src).await?; // We dont care about them, but they have to be there
+    while let Some(chunk_id) = or_eof(read_stack_async::<4>(src).await)? {
+        let chunk_size = u32::from_le_bytes(read_stack_async::<4>(src).await?);
+        if &chunk_id == TAGS_ID {
+            return decode_tags_async(src).await;
+        }
+        skip_async(src, chunk_size as i64).await?;
+        if chunk_size & 1 == 1 {
+            skip_async(src, 1).await?;
+        }
+    }
+    Ok(Vec::new())
+}
 
 /// Given a `src`, return the tags contained inside.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
@@ -43,6 +65,50 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
         }
     }
     Ok(Vec::new())
+}
+
+/// Read data from `src`, set the provided `tags`, and write to `dest`.
+///
+/// This function will remove any tags that previously existed in `src`.
+pub async fn write_tags_async(
+    src: &mut (impl AsyncReadExt+ AsyncSeekExt + Unpin),
+    dest: &mut (impl AsyncWriteExt + Unpin),
+    tags: impl IntoIterator<Item = impl AsRef<str>>,
+) -> Result<(), Error> {
+    passthrough_async(src, dest, 4).await?;
+    skip_async(src, 4).await?;
+    let mut data = Vec::new();
+    passthrough_async(src, &mut data, 4).await?;
+    while let Some(chunk_id) = or_eof(read_stack_async::<4>(src).await)? {
+        let chunk_size_bytes = read_stack_async::<4>(src).await?;
+        let chunk_size = u32::from_le_bytes(chunk_size_bytes);
+        if &chunk_id == TAGS_ID {
+            skip_async(src, chunk_size as i64).await?;
+            if chunk_size & 1 == 1 {
+                skip_async(src, 1).await?;
+            }
+        } else {
+            data.extend(&chunk_id);
+            data.extend(&chunk_size_bytes);
+            if passthrough_async(src, &mut data, chunk_size as u64).await? != chunk_size as u64 {
+                return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))?;
+            };
+            if chunk_size & 1 == 1 {
+                dest.write_all(&[0]).await?;
+            }
+        }
+    }
+    let mut tags_bytes = Vec::new();
+    encode_tags_async(tags, std::pin::pin!(&mut tags_bytes)).await?;
+    data.extend(TAGS_ID);
+    data.extend(&(tags_bytes.len() as u32).to_le_bytes());
+    data.extend(&tags_bytes);
+    if tags_bytes.len() & 1 == 1 {
+        data.extend(&[0]);
+    }
+    dest.write_all(&(data.len() as u32).to_le_bytes()).await?;
+    dest.write_all(&data).await?;
+    Ok(())
 }
 
 /// Read data from `src`, set the provided `tags`, and write to `dest`.

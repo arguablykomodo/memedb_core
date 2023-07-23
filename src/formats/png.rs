@@ -21,8 +21,14 @@
 pub(crate) const MAGIC: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
 pub(crate) const OFFSET: usize = 0;
 
+use futures::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+
 use crate::{
     utils::{encode_tags, passthrough, read_byte, read_heap, read_stack, skip},
+    utils::{
+        encode_tags_async, passthrough_async, read_byte_async, read_heap_async, read_stack_async,
+        skip_async,
+    },
     Error,
 };
 use std::io::{Read, Seek, Write};
@@ -31,6 +37,54 @@ const TAG_CHUNK: &[u8; 4] = b"meMe";
 const END_CHUNK: &[u8; 4] = b"IEND";
 
 const CRC: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_ISO_HDLC);
+
+/// Given a `src`, return the tags contained inside.
+pub async fn read_tags_async(
+    src: &mut (impl AsyncReadExt + AsyncSeekExt + Unpin),
+) -> Result<Vec<String>, Error> {
+    skip_async(src, MAGIC.len() as i64).await?;
+    loop {
+        let chunk_length = u32::from_be_bytes(read_stack_async::<4>(src).await?);
+        let chunk_type = read_stack_async::<4>(src).await?;
+        match &chunk_type {
+            END_CHUNK => return Ok(Vec::new()),
+            TAG_CHUNK => {
+                let mut digest = CRC.digest();
+                digest.update(&chunk_type);
+                let mut tags = Vec::new();
+                let mut tag_bytes = Vec::new();
+                loop {
+                    let byte = read_byte_async(src).await?;
+                    digest.update(&[byte]);
+                    match byte {
+                        0b00000000 => break,
+                        0b00000001..=0b01111111 => {
+                            let bytes = read_heap_async(src, byte as usize).await?;
+                            digest.update(&bytes);
+                            tag_bytes.extend(bytes);
+                            continue;
+                        }
+                        0b10000000..=0b11111111 => {
+                            let bytes = read_heap_async(src, (byte & 0b01111111) as usize).await?;
+                            digest.update(&bytes);
+                            tag_bytes.extend(bytes);
+                            tags.push(String::from_utf8(tag_bytes)?);
+                            tag_bytes = Vec::new();
+                        }
+                    }
+                }
+                let checksum = u32::from_be_bytes(read_stack_async::<4>(src).await?);
+                if checksum != digest.finalize() {
+                    return Err(Error::PngChecksum);
+                }
+                return Ok(tags);
+            }
+            _ => {
+                skip_async(src, chunk_length as i64 + 4).await?;
+            }
+        }
+    }
+}
 
 /// Given a `src`, return the tags contained inside.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
@@ -73,6 +127,54 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
             }
             _ => {
                 skip(src, chunk_length as i64 + 4)?;
+            }
+        }
+    }
+}
+
+/// Read data from `src`, set the provided `tags`, and write to `dest`.
+///
+/// This function will remove any tags that previously existed in `src`.
+pub async fn write_tags_async(
+    src: &mut (impl AsyncReadExt + AsyncSeekExt + Unpin),
+    dest: &mut (impl AsyncWriteExt + Unpin),
+    tags: impl IntoIterator<Item = impl AsRef<str>>,
+) -> Result<(), Error> {
+    passthrough_async(src, dest, MAGIC.len() as u64).await?;
+    // Passthrough first IHDR chunk
+    let chunk_length = u32::from_be_bytes(read_stack_async::<4>(src).await?);
+    let chunk_type = read_stack_async::<4>(src).await?;
+    dest.write_all(&chunk_length.to_be_bytes()).await?;
+    dest.write_all(&chunk_type).await?;
+    passthrough_async(src, dest, chunk_length as u64 + 4).await?;
+
+    let mut digest = CRC.digest();
+    digest.update(TAG_CHUNK);
+    let mut tags_bytes = Vec::new();
+    encode_tags_async(tags, std::pin::pin!(&mut tags_bytes)).await?;
+    digest.update(&tags_bytes);
+    dest.write_all(&(tags_bytes.len() as u32).to_be_bytes()).await?;
+    dest.write_all(TAG_CHUNK).await?;
+    dest.write_all(&tags_bytes).await?;
+    dest.write_all(&digest.finalize().to_be_bytes()).await?;
+
+    loop {
+        let chunk_length = u32::from_be_bytes(read_stack_async::<4>(src).await?);
+        let chunk_type = read_stack_async::<4>(src).await?;
+        match &chunk_type {
+            TAG_CHUNK => {
+                skip_async(src, chunk_length as i64 + 4).await?;
+            }
+            END_CHUNK => {
+                dest.write_all(&chunk_length.to_be_bytes()).await?;
+                dest.write_all(&chunk_type).await?;
+                passthrough_async(src, dest, chunk_length as u64 + 4).await?;
+                return Ok(());
+            }
+            _ => {
+                dest.write_all(&chunk_length.to_be_bytes()).await?;
+                dest.write_all(&chunk_type).await?;
+                passthrough_async(src, dest, chunk_length as u64 + 4).await?;
             }
         }
     }
