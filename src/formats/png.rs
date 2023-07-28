@@ -66,8 +66,9 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
                     }
                 }
                 let checksum = u32::from_be_bytes(read_stack::<4>(src)?);
-                if checksum != digest.finalize() {
-                    return Err(Error::PngChecksum);
+                let finalized = digest.finalize();
+                if checksum != finalized {
+                    return Err(Error::PngChecksum(checksum, finalized));
                 }
                 return Ok(tags);
             }
