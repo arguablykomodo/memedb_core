@@ -48,6 +48,6 @@
 
 - Initial support for PNG, JPEG, and GIF.
 
-[1.0.2]: https://gitlab.com/memedb/memedb_core/-/compare/v1.0.1...v1.0.2
-[1.0.1]: https://gitlab.com/memedb/memedb_core/-/compare/v1.0.0...v1.0.1
-[1.0.0]: https://gitlab.com/memedb/memedb_core/-/commits/v1.0.0
+[1.0.2]: https://github.com/arguablykomodo/memedb_core/releases/tag/v1.0.2
+[1.0.1]: https://github.com/arguablykomodo/memedb_core/releases/tag/v1.0.1
+[1.0.0]: https://github.com/arguablykomodo/memedb_core/releases/tag/v1.0.0

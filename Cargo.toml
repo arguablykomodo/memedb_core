@@ -1,18 +1,14 @@
 [package]
 name = "memedb_core"
 version = "1.0.2"
-authors = ["SrKomodo", "PeronTheDuck"]
-description = "Rust library for reading and writing tags to media files, specifically for the use of categorizing memes."
-# homepage = "..."
-repository = "https://gitlab.com/memedb/memedb_core"
+authors = ["Komodo", "BlueTheDuck"]
+description = "Rust library for reading and writing tags to different media formats"
+repository = "https://github.com/arguablykomodo/memedb_core"
 readme = "README.md"
 keywords = ["meme", "db", "tags"]
 categories = ["parser-implementations", "encoding", "data-structures"]
 license = "GPL-3.0-or-later"
 edition = "2021"
-
-[badges]
-gitlab = { repository = "memedb/memedb_core" }
 
 [features]
 default = ["gif", "isobmff", "jpeg", "png", "riff"]
