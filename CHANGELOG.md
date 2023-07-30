@@ -1,6 +1,6 @@
 # Changelog
 
-## Next version (Unreleased)
+## [2.0.0] - 2023-07-30
 
 ### BREAKING CHANGES
 
