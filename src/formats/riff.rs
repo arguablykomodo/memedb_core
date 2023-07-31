@@ -72,7 +72,7 @@ pub fn write_tags(
                 return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))?;
             };
             if chunk_size & 1 == 1 {
-                dest.write_all(&[0])?;
+                data.write_all(&[0])?;
             }
         }
     }

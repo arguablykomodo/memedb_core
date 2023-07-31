@@ -1,5 +1,12 @@
 # Changelog
 
+## Next version (Unreleased)
+
+### Fixes
+
+- RIFF parser:
+  - Correctly write padding bytes.
+
 ## [2.0.0] - 2023-07-30
 
 ### BREAKING CHANGES
