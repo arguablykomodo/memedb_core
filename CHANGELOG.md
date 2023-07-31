@@ -4,6 +4,8 @@
 
 ### Fixes
 
+- JPEG parser:
+  - Correctly handle APP3 segments that don't contain tags.
 - RIFF parser:
   - Correctly write padding bytes.
 

@@ -141,12 +141,16 @@ pub fn write_tags(
                     dest.write_all(&[0xFF, marker])?;
                     dest.write_all(&length_bytes)?;
                     passthrough(src, dest, length as u64)?;
-                } else if read_heap(src, TAGS_ID.len())? != TAGS_ID {
-                    dest.write_all(&[0xFF, marker])?;
-                    dest.write_all(&length_bytes)?;
-                    passthrough(src, dest, length.saturating_sub(TAGS_ID.len() as u16) as u64)?;
                 } else {
-                    skip(src, length.saturating_sub(TAGS_ID.len() as u16) as i64)?;
+                    let tag = read_heap(src, TAGS_ID.len())?;
+                    if tag == TAGS_ID {
+                        skip(src, length.saturating_sub(TAGS_ID.len() as u16) as i64)?;
+                    } else {
+                        dest.write_all(&[0xFF, marker])?;
+                        dest.write_all(&length_bytes)?;
+                        dest.write_all(&tag)?;
+                        passthrough(src, dest, length.saturating_sub(TAGS_ID.len() as u16) as u64)?;
+                    }
                 }
             }
             0xD9 => {
