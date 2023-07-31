@@ -22,7 +22,7 @@ pub(crate) const MAGIC: &[u8] = b"\x89PNG\x0D\x0A\x1A\x0A";
 pub(crate) const OFFSET: usize = 0;
 
 use crate::{
-    utils::{encode_tags, passthrough, read_byte, read_heap, read_stack, skip},
+    utils::{decode_tags, encode_tags, passthrough, read_stack, skip},
     Error,
 };
 use std::io::{Read, Seek, Write};
@@ -31,6 +31,25 @@ const TAG_CHUNK: &[u8; 4] = b"meMe";
 const END_CHUNK: &[u8; 4] = b"IEND";
 
 const CRC: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_ISO_HDLC);
+
+struct Checksum<'a, T: Read + Seek> {
+    src: &'a mut T,
+    digest: crc::Digest<'a, u32>,
+}
+
+impl<'a, T: Read + Seek> Checksum<'a, T> {
+    fn new(src: &'a mut T, digest: crc::Digest<'a, u32>) -> Self {
+        Self { src, digest }
+    }
+}
+
+impl<'a, T: Read + Seek> Read for Checksum<'a, T> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let n = self.src.read(buf)?;
+        self.digest.update(buf);
+        Ok(n)
+    }
+}
 
 /// Given a `src`, return the tags contained inside.
 pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
@@ -43,30 +62,10 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
             TAG_CHUNK => {
                 let mut digest = CRC.digest();
                 digest.update(&chunk_type);
-                let mut tags = Vec::new();
-                let mut tag_bytes = Vec::new();
-                loop {
-                    let byte = read_byte(src)?;
-                    digest.update(&[byte]);
-                    match byte {
-                        0b00000000 => break,
-                        0b00000001..=0b01111111 => {
-                            let bytes = read_heap(src, byte as usize)?;
-                            digest.update(&bytes);
-                            tag_bytes.extend(bytes);
-                            continue;
-                        }
-                        0b10000000..=0b11111111 => {
-                            let bytes = read_heap(src, (byte & 0b01111111) as usize)?;
-                            digest.update(&bytes);
-                            tag_bytes.extend(bytes);
-                            tags.push(String::from_utf8(tag_bytes)?);
-                            tag_bytes = Vec::new();
-                        }
-                    }
-                }
+                let mut tags_src = Checksum::new(src, digest);
+                let tags = decode_tags(&mut tags_src)?;
+                let finalized = tags_src.digest.finalize();
                 let checksum = u32::from_be_bytes(read_stack::<4>(src)?);
-                let finalized = digest.finalize();
                 if checksum != finalized {
                     return Err(Error::PngChecksum(checksum, finalized));
                 }
