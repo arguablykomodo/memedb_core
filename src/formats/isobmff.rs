@@ -163,4 +163,24 @@ pub fn write_tags(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    const ZERO_BOX: &[&[u8]] = &[&0u32.to_be_bytes(), &[0; 8]];
+    const SIZED_BOX: &[&[u8]] = &[&12u32.to_be_bytes(), &[0; 8]];
+    const TAGS: &[&[u8]] = &[&26u32.to_be_bytes(), b"uuid", &MEMEDB_UUID, &[0x80, 0x00]];
+
+    #[test]
+    fn size_zero_box() {
+        let src = &ZERO_BOX.concat();
+        assert_eq!(read_tags(&mut Cursor::new(src)).unwrap(), Vec::<String>::new());
+        let mut dest = Vec::new();
+        write_tags(&mut Cursor::new(src), &mut dest, vec![""]).unwrap();
+        let expected = &[SIZED_BOX.concat(), TAGS.concat()].concat();
+        assert_eq!(&dest, expected);
+    }
+}
+
 crate::utils::standard_tests!("mp4");

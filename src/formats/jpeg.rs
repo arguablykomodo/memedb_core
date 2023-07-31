@@ -176,4 +176,36 @@ pub fn write_tags(
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    const START: &[u8] = &[0xFF, 0xD8];
+    const END: &[u8] = &[0xFF, 0xD9];
+    const TAGS: &[&[u8]] = &[&[0xFF, 0xE4, 0x00, 0x0A], TAGS_ID, &[0x00]];
+    const SMALL: &[u8] = &[0xFF, 0xE4, 0x00, 0x03, 0x00];
+    const WRONG: &[&[u8]] = &[&[0xFF, 0xE4, 0x00, 0x09], &[0; 7]];
+
+    #[test]
+    fn small_segment() {
+        let src = &[START, SMALL, END].concat();
+        assert_eq!(read_tags(&mut Cursor::new(src)).unwrap(), Vec::<String>::new());
+        let mut dest = Vec::new();
+        write_tags(&mut Cursor::new(src), &mut dest, Vec::<String>::new()).unwrap();
+        let expected = &[START, &TAGS.concat(), SMALL, END].concat();
+        assert_eq!(&dest, expected);
+    }
+
+    #[test]
+    fn wrong_segment() {
+        let src = &[START, &WRONG.concat(), END].concat();
+        assert_eq!(read_tags(&mut Cursor::new(src)).unwrap(), Vec::<String>::new());
+        let mut dest = Vec::new();
+        write_tags(&mut Cursor::new(src), &mut dest, Vec::<String>::new()).unwrap();
+        let expected = &[START, &TAGS.concat(), &WRONG.concat(), END].concat();
+        assert_eq!(&dest, expected);
+    }
+}
+
 crate::utils::standard_tests!("jpeg");

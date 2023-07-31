@@ -89,4 +89,23 @@ pub fn write_tags(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    const TAGS: &[&[u8]] = &[TAGS_ID, &[0x01], &[0; 5]];
+    const ODD: &[&[u8]] = &[&[0; 4], &[0x01], &[0; 5]];
+
+    #[test]
+    fn odd_size_chunk() {
+        let src = &[MAGIC, &[0x0E], &[0; 7], &ODD.concat()].concat();
+        assert_eq!(read_tags(&mut Cursor::new(src)).unwrap(), Vec::<String>::new());
+        let mut dest = Vec::new();
+        write_tags(&mut Cursor::new(src), &mut dest, Vec::<String>::new()).unwrap();
+        let expected = &[MAGIC, &[0x18], &[0; 7], &ODD.concat(), &TAGS.concat()].concat();
+        assert_eq!(&dest, expected);
+    }
+}
+
 crate::utils::standard_tests!("webp");

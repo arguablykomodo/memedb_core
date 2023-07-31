@@ -164,4 +164,25 @@ pub fn write_tags(
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    const START: &[u8] = &[0u8; 13];
+    const END: &[u8] = &[0x3B];
+    const TAGS: &[&[u8]] = &[&[0x21, 0xFF, 0xB], IDENTIFIER, &[0x01, 0x00, 0x00]];
+    const DESCRIPTOR: &[&[u8]] = &[&[0x2C], &[0; 8], &[0x80], &[0; 8]];
+
+    #[test]
+    fn local_color_tables() {
+        let src = &[START, &DESCRIPTOR.concat(), &END].concat();
+        assert_eq!(read_tags(&mut Cursor::new(src)).unwrap(), Vec::<String>::new());
+        let mut dest = Vec::new();
+        write_tags(&mut Cursor::new(src), &mut dest, Vec::<String>::new()).unwrap();
+        let expected = &[START, &TAGS.concat(), &DESCRIPTOR.concat(), &END].concat();
+        assert_eq!(&dest, expected);
+    }
+}
+
 crate::utils::standard_tests!("gif");

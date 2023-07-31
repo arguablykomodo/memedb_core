@@ -77,6 +77,19 @@ pub fn decode_tags(src: &mut impl Read) -> Result<Vec<String>, crate::Error> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quickcheck_macros::quickcheck;
+
+    #[quickcheck]
+    fn qc_tags_identity(tags: Vec<String>) -> bool {
+        let mut buf = Vec::new();
+        encode_tags(&tags, &mut buf).unwrap();
+        decode_tags(&mut &buf[..]).unwrap() == tags
+    }
+}
+
 macro_rules! standard_tests {
     ($e:literal) => {
         #[cfg(test)]
