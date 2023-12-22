@@ -2,10 +2,9 @@
 //!
 //! A Rust library for reading and writing tags to media streams.
 //!
-//! The library exposes the general purpose [`read_tags`][crate::read_tags] and
-//! [`write_tags`][crate::read_tags] functions, which try to heuristically detect the format of the
-//! source. For more specific use cases, each module in the library exposes specific `read_tags`
-//! and `write_tags` functions for each format.
+//! The library exposes the general purpose [`read_tags`] and [`write_tags`] functions, which try
+//! to heuristically detect the format of the source. For more specific use cases, each module in
+//! the library exposes specific `read_tags` and `write_tags` functions for each format.
 
 #![warn(clippy::pedantic)]
 #![allow(
@@ -36,8 +35,8 @@ use std::io::{BufRead, Read, Seek, Write};
 
 /// Given a `src`, return the tags (if any) contained inside.
 ///
-/// This function operates by first calling [`identify_format`](crate::identify_format), and then
-/// calling the corresponding `read_tags` function if successful.
+/// This function operates by first calling [`identify_format`], and then calling the corresponding
+/// `read_tags` function if successful.
 pub fn read_tags(src: &mut (impl Read + BufRead + Seek)) -> Result<Option<Vec<String>>, Error> {
     if let Some(format) = identify_format(src)? {
         src.seek(std::io::SeekFrom::Start(0))?;
@@ -63,8 +62,8 @@ pub fn read_tags(src: &mut (impl Read + BufRead + Seek)) -> Result<Option<Vec<St
 ///
 /// This function will remove any tags that previously existed in the source.
 ///
-/// This function operates by first calling [`identify_format`](crate::identify_format), and then
-/// calling the corresponding `write_tags` function if successful.
+/// This function operates by first calling [`identify_format`], and then calling the corresponding
+/// `write_tags` function if successful.
 pub fn write_tags(
     src: &mut (impl Read + BufRead + Seek),
     dest: &mut impl Write,
