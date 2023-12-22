@@ -122,7 +122,7 @@ pub fn read_tags(src: &mut (impl Read + Seek)) -> Result<Vec<String>, Error> {
         let size = r#box.data_size();
         // We passthrough instead of skip to get number of bytes read
         if passthrough(src, &mut std::io::sink(), size)? != size {
-            return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))?;
+            Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))?;
         };
     }
     Ok(Vec::new())

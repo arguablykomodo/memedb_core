@@ -69,7 +69,7 @@ pub fn write_tags(
             data.extend(&chunk_id);
             data.extend(&chunk_size_bytes);
             if passthrough(src, &mut data, chunk_size as u64)? != chunk_size as u64 {
-                return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))?;
+                Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))?;
             };
             if chunk_size & 1 == 1 {
                 data.write_all(&[0])?;
