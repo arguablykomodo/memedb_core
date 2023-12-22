@@ -1,6 +1,6 @@
 [package]
 name = "memedb_core"
-version = "2.0.0"
+version = "2.0.1"
 authors = ["Komodo", "BlueTheDuck"]
 description = "Rust library for reading and writing tags to different media formats"
 repository = "https://github.com/arguablykomodo/memedb_core"
